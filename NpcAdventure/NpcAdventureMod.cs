@@ -6,6 +6,9 @@ using StardewValley;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using System;
+using Harmony;
+using System.Reflection;
+using NpcAdventure.Events;
 using NpcAdventure.Model;
 
 namespace NpcAdventure
@@ -14,12 +17,16 @@ namespace NpcAdventure
     public class NpcAdventureMod : Mod
     {
         private CompanionManager companionManager;
+
+        public static IMonitor GameMonitor { get; private set; }
+
         private ContentLoader contentLoader;
         private Config config;
 
         private DialogueDriver DialogueDriver { get; set; }
         private HintDriver HintDriver { get; set; }
         private StuffDriver StuffDriver { get; set; }
+        private ISpecialModEvents SpecialEvents { get; set; }
 
         /// <summary>The mod entry point, called after the mod is first loaded.</summary>
         /// <param name="helper">Provides simplified APIs for writing mods.</param>
@@ -27,6 +34,17 @@ namespace NpcAdventure
         {
             this.RegisterEvents(helper.Events);
             this.config = helper.ReadConfig<Config>();
+
+            //Harmony
+            HarmonyInstance harmony = HarmonyInstance.Create("Purrplingcat.NpcAdventure");
+            harmony.Patch(
+                original: AccessTools.Method(typeof(GameLocation), "draw"),
+                postfix: new HarmonyMethod(typeof(Patches.GameLocationDrawPatch), nameof(Patches.GameLocationDrawPatch.Postfix))
+            );
+
+            Patches.GameLocationDrawPatch.Setup(this.SpecialEvents);
+
+            NpcAdventureMod.GameMonitor = this.Monitor;
         }
 
         private void RegisterEvents(IModEvents events)
@@ -37,6 +55,7 @@ namespace NpcAdventure
             events.GameLoop.DayEnding += this.GameLoop_DayEnding;
             events.GameLoop.DayStarted += this.GameLoop_DayStarted;
             events.GameLoop.GameLaunched += this.GameLoop_GameLaunched;
+            this.SpecialEvents = new SpecialModEvents();
         }
 
         private void GameLoop_GameLaunched(object sender, GameLaunchedEventArgs e)
@@ -98,7 +117,7 @@ namespace NpcAdventure
 
         private void GameLoop_SaveLoaded(object sender, StardewModdingAPI.Events.SaveLoadedEventArgs e)
         {
-            this.companionManager.InitializeCompanions(this.contentLoader, this.Helper.Events, this.Helper.Reflection);
+            this.companionManager.InitializeCompanions(this.contentLoader, this.Helper.Events, this.SpecialEvents, this.Helper.Reflection);
         }
     }
 }
