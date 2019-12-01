@@ -13,6 +13,7 @@ using static NpcAdventure.StateMachine.CompanionStateMachine;
 using NpcAdventure.Model;
 using Microsoft.Xna.Framework.Graphics;
 using NpcAdventure.Events;
+using NpcAdventure.NetCode;
 
 namespace NpcAdventure
 {
@@ -23,6 +24,7 @@ namespace NpcAdventure
         private readonly IMonitor monitor;
         public Dictionary<string, CompanionStateMachine> PossibleCompanions { get; }
         public Config Config { get; }
+        public NetEvents netEvents;
 
         public Farmer Farmer
         {
@@ -34,13 +36,14 @@ namespace NpcAdventure
             }
         }
 
-        public CompanionManager(DialogueDriver dialogueDriver, HintDriver hintDriver, Config config, IMonitor monitor)
+        public CompanionManager(DialogueDriver dialogueDriver, HintDriver hintDriver, Config config, IMonitor monitor, NetEvents netEvents)
         {
             this.dialogueDriver = dialogueDriver ?? throw new ArgumentNullException(nameof(dialogueDriver));
             this.hintDriver = hintDriver ?? throw new ArgumentNullException(nameof(hintDriver));
             this.monitor = monitor ?? throw new ArgumentNullException(nameof(monitor));
             this.PossibleCompanions = new Dictionary<string, CompanionStateMachine>();
             this.Config = config;
+            this.netEvents = netEvents;
 
             this.dialogueDriver.DialogueRequested += this.DialogueDriver_DialogueRequested;
             this.dialogueDriver.DialogueChanged += this.DialogueDriver_DialogueChanged;
@@ -110,13 +113,13 @@ namespace NpcAdventure
         /// When any companion was recruited
         /// </summary>
         /// <param name="companionName">NPC name of companion</param>
-        internal void CompanionRecuited(string companionName)
+        internal void CompanionRecuited(string companionName, Farmer byWhom)
         {
             foreach (var csmKv in this.PossibleCompanions)
             {
                 // All other companions are unavailable now (Player can't recruit them right now)
                 if (csmKv.Value.Name != companionName)
-                    csmKv.Value.MakeUnavailable();
+                    csmKv.Value.MakeUnavailable(byWhom);
             }
 
             this.monitor.Log($"You are recruited {companionName} companion.");

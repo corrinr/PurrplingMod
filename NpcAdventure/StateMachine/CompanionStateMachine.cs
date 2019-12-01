@@ -37,7 +37,7 @@ namespace NpcAdventure.StateMachine
         public Chest Bag { get; private set; }
         public IReflectionHelper Reflection { get; }
         public Dictionary<StateFlag, ICompanionState> States { get; private set; }
-        private ICompanionState currentState;
+        public ICompanionState currentState { get; private set; }
 
         public CompanionStateMachine(CompanionManager manager, NPC companion, CompanionMetaData metadata, IContentLoader loader, IReflectionHelper reflection, IMonitor monitor = null)
         {
@@ -69,7 +69,7 @@ namespace NpcAdventure.StateMachine
         /// Change companion state machine state
         /// </summary>
         /// <param name="stateFlag">Flag of allowed state</param>
-        private void ChangeState(StateFlag stateFlag)
+        private void ChangeState(StateFlag stateFlag, Farmer byWhom)
         {
             if (this.States == null)
                 throw new InvalidStateException("State machine is not ready! Call setup first.");
@@ -85,6 +85,7 @@ namespace NpcAdventure.StateMachine
                 this.currentState.Exit();
             }
 
+            newState.SetByWhom(byWhom);
             newState.Entry();
             this.currentState = newState;
             this.Monitor.Log($"{this.Name} changed state: {this.CurrentStateFlag.ToString()} -> {stateFlag.ToString()}");
@@ -131,7 +132,7 @@ namespace NpcAdventure.StateMachine
             if (Utility.isFestivalDay(Game1.dayOfMonth, Game1.currentSeason))
             {
                 this.Monitor.Log($"{this.Name} is unavailable to recruit due to festival today.");
-                this.MakeUnavailable();
+                this.MakeUnavailable(null);
                 return;
             }
 
@@ -143,7 +144,7 @@ namespace NpcAdventure.StateMachine
                 DialogueHelper.SetupCompanionDialogues(this.Companion, this.ContentLoader.LoadStrings($"Dialogue/{this.Name}Spouse"));
 
             this.RecruitedToday = false;
-            this.MakeAvailable();
+            this.MakeAvailable(null);
         }
 
         /// <summary>
@@ -210,47 +211,47 @@ namespace NpcAdventure.StateMachine
         /// <summary>
         /// Make companion AVAILABLE to recruit
         /// </summary>
-        public void MakeAvailable()
+        public void MakeAvailable(Farmer byWhom = null)
         {
-            this.ChangeState(StateFlag.AVAILABLE);
+            this.ChangeState(StateFlag.AVAILABLE, byWhom);
         }
 
         /// <summary>
         /// Make companion UNAVAILABLE to recruit
         /// </summary>
-        public void MakeUnavailable()
+        public void MakeUnavailable(Farmer byWhom = null)
         {
-            this.ChangeState(StateFlag.UNAVAILABLE);
+            this.ChangeState(StateFlag.UNAVAILABLE, byWhom);
         }
 
         /// <summary>
         /// Reset companion's state machine
         /// </summary>
-        public void ResetStateMachine()
+        public void ResetStateMachine(Farmer byWhom = null)
         {
-            this.ChangeState(StateFlag.RESET);
+            this.ChangeState(StateFlag.RESET, byWhom);
         }
 
         /// <summary>
         /// Dismiss recruited companion
         /// </summary>
         /// <param name="keepUnavailableOthers">Keep other companions unavailable?</param>
-        internal void Dismiss(bool keepUnavailableOthers = false)
+        internal void Dismiss(bool keepUnavailableOthers = false, Farmer byWhom = null)
         {
-            this.ResetStateMachine();
+            this.ResetStateMachine(byWhom);
 
             if (this.currentState is ICompanionIntegrator integrator)
                 integrator.ReintegrateCompanionNPC();
 
             this.BackedupSchedule = null;
-            this.ChangeState(StateFlag.UNAVAILABLE);
+            this.ChangeState(StateFlag.UNAVAILABLE, byWhom);
             this.CompanionManager.CompanionDissmised(keepUnavailableOthers);
         }
 
         /// <summary>
         /// Recruit this companion
         /// </summary>
-        public void Recruit()
+        public void Recruit(Farmer byWhom)
         {
             this.BackedupSchedule = this.Companion.Schedule;
             this.RecruitedToday = true;
@@ -261,8 +262,8 @@ namespace NpcAdventure.StateMachine
                 this.Companion.setTileLocation(this.Companion.GetGrabTile());
             }
 
-            this.ChangeState(StateFlag.RECRUITED);
-            this.CompanionManager.CompanionRecuited(this.Companion.Name);
+            this.ChangeState(StateFlag.RECRUITED, byWhom);
+            this.CompanionManager.CompanionRecuited(this.Companion.Name, byWhom);
         }
 
         public void Dispose()

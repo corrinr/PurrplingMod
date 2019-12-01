@@ -38,10 +38,10 @@ namespace NpcAdventure.AI
         private Dictionary<State, IController> controllers;
         private int changeStateCooldown = 0;
 
-        internal AI_StateMachine(CompanionStateMachine csm, IModEvents events, IMonitor monitor)
+        internal AI_StateMachine(CompanionStateMachine csm, Farmer leader, IModEvents events, IMonitor monitor)
         {
             this.npc = csm.Companion;
-            this.player = csm.CompanionManager.Farmer;
+            this.player = leader;
             this.events = events ?? throw new ArgumentException(nameof(events));
             this.Monitor = monitor ?? throw new ArgumentNullException(nameof(monitor));
             this.Csm = csm;

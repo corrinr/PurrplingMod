@@ -5,13 +5,13 @@ using StardewValley;
 using StardewModdingAPI;
 using System.Collections.Generic;
 using System;
+using static NpcAdventure.NetCode.NetEvents;
 
 namespace NpcAdventure.StateMachine.State
 {
     internal class AvailableState : CompanionState, IRequestedDialogueCreator, IDialogueDetector
     {
         private Dialogue acceptalDialogue;
-        private Dialogue rejectionDialogue;
         private Dialogue suggestionDialogue;
 
         public bool CanCreateDialogue { get; private set; }
@@ -92,28 +92,32 @@ namespace NpcAdventure.StateMachine.State
         {
             this.Events.GameLoop.TimeChanged -= this.GameLoop_TimeChanged;
             this.CanCreateDialogue = false;
-            this.acceptalDialogue = null;
-            this.rejectionDialogue = null;
             this.suggestionDialogue = null;
         }
 
-        private void ReactOnAnswer(NPC n, Farmer leader)
+        public void Recruit(Farmer byWhom)
         {
-            if (leader.getFriendshipHeartLevelForNPC(n.Name) < this.StateMachine.CompanionManager.Config.HeartThreshold || Game1.timeOfDay >= 2200)
+            if (!this.StateMachine.Companion.doingEndOfRouteAnimation.Value)
             {
-                Dialogue rejectionDialogue = new Dialogue(
-                    DialogueHelper.GetDialogueString(
-                        n, Game1.timeOfDay >= 2200 ? "companionRejectedNight" : "companionRejected"), n);
+                this.StateMachine.Companion.Halt();
+                this.StateMachine.Companion.facePlayer(byWhom);
+            }
+            this.ReactOnAnswer(this.StateMachine.Companion, byWhom);
+        }
 
-                this.rejectionDialogue = rejectionDialogue;
-                DialogueHelper.DrawDialogue(rejectionDialogue);
+        private void ReactOnAnswer(NPC n, Farmer byWhom)
+        {
+            if (byWhom.getFriendshipHeartLevelForNPC(n.Name) < this.StateMachine.CompanionManager.Config.HeartThreshold || Game1.timeOfDay >= 2200)
+            {
+                this.StateMachine.CompanionManager.netEvents.FireEvent(new DialogEvent("showDialogue", Game1.timeOfDay >= 2200 ? "companionRejectedNight" : "companionRejected", n), byWhom);
+                this.StateMachine.MakeUnavailable(byWhom);
             }
             else
             {
-                Dialogue acceptalDialogue = new Dialogue(DialogueHelper.GetDialogueString(n, "companionAccepted"), n);
+                this.StateMachine.CompanionManager.netEvents.FireEvent(new DialogEvent("showDialogue", "companionAccepted", n), byWhom);
 
-                this.acceptalDialogue = acceptalDialogue;
-                DialogueHelper.DrawDialogue(acceptalDialogue);
+                this.StateMachine.CompanionManager.Farmer.changeFriendship(40, this.StateMachine.Companion);
+                this.StateMachine.Recruit(byWhom);
             }
         }
 
@@ -128,27 +132,14 @@ namespace NpcAdventure.StateMachine.State
             {
                 if (answer == "Yes")
                 {
-                    if (!this.StateMachine.Companion.doingEndOfRouteAnimation.Value)
-                    {
-                        this.StateMachine.Companion.Halt();
-                        this.StateMachine.Companion.facePlayer(leader);
-                    }
-                    this.ReactOnAnswer(this.StateMachine.Companion, leader);
+                    this.StateMachine.CompanionManager.netEvents.FireEvent(new CompanionRequestEvent(this.StateMachine.Companion));
                 }
             }, null);
         }
 
-        public void OnDialogueSpeaked(Dialogue speakedDialogue)
+        public void OnDialogueSpeaked(Dialogue speakedDialogue) // XXXX taky jenom na serveru
         {
-            if (speakedDialogue == this.acceptalDialogue)
-            {
-                this.StateMachine.CompanionManager.Farmer.changeFriendship(40, this.StateMachine.Companion);
-                this.StateMachine.Recruit();
-            }
-            else if (speakedDialogue == this.rejectionDialogue)
-            {
-                this.StateMachine.MakeUnavailable();
-            }
+
         }
     }
 }

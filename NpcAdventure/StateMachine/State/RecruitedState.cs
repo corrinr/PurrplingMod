@@ -15,6 +15,7 @@ using StardewModdingAPI;
 using NpcAdventure.AI;
 using Microsoft.Xna.Framework.Graphics;
 using NpcAdventure.Events;
+using static NpcAdventure.NetCode.NetEvents;
 
 namespace NpcAdventure.StateMachine.State
 {
@@ -36,7 +37,7 @@ namespace NpcAdventure.StateMachine.State
 
         public override void Entry()
         {
-            this.ai = new AI_StateMachine(this.StateMachine, this.Events, this.monitor);
+            this.ai = new AI_StateMachine(this.StateMachine, this.setByWhom, this.Events, this.monitor);
 
             if (this.StateMachine.Companion.doingEndOfRouteAnimation.Value)
                 this.FinishScheduleAnimation();
@@ -212,22 +213,33 @@ namespace NpcAdventure.StateMachine.State
             this.StateMachine.Companion.temporaryController = null;
         }
 
-        private void Player_Warped(object sender, WarpedEventArgs e)
+        public void PlayerHasWarped(GameLocation from, GameLocation to)
         {
             NPC companion = this.StateMachine.Companion;
-            Farmer farmer = this.StateMachine.CompanionManager.Farmer;
+            Farmer farmer = this.setByWhom;
             Dictionary<string, string> bubbles = this.StateMachine.ContentLoader.LoadStrings("Strings/SpeechBubbles");
 
             // Warp companion to farmer if it's needed
-            if (companion.currentLocation != e.NewLocation)
-                this.ai.ChangeLocation(e.NewLocation);
+            if (companion.currentLocation != to)
+                this.ai.ChangeLocation(to);
 
             // Show above head bubble text for location
-            if (Game1.random.NextDouble() > 66f && DialogueHelper.GetBubbleString(bubbles, companion, e.NewLocation, out string bubble))
+            if (Game1.random.NextDouble() > 66f && DialogueHelper.GetBubbleString(bubbles, companion, to, out string bubble))
                 companion.showTextAboveHead(bubble, preTimer: 250);
 
             // Push new location dialogue
-            this.TryPushLocationDialogue(e.NewLocation);
+            this.TryPushLocationDialogue(from);
+        }
+
+        private void Player_Warped(object sender, WarpedEventArgs e)
+        {
+            if (e.Player != Game1.MasterPlayer) // send to the server when we change location and we're not server
+            {
+                this.StateMachine.CompanionManager.netEvents.FireEvent(new PlayerWarpedEvent(this.StateMachine.Companion, e.OldLocation, e.NewLocation));
+                return;
+            }
+
+            this.PlayerHasWarped(e.OldLocation, e.NewLocation);
         }
 
         private bool TryPushLocationDialogue(GameLocation location)
@@ -267,8 +279,8 @@ namespace NpcAdventure.StateMachine.State
             if (this.ai != null && this.ai.PerformAction())
                 return;
 
-            Farmer leader = this.StateMachine.CompanionManager.Farmer;
-            GameLocation location = this.StateMachine.CompanionManager.Farmer.currentLocation;
+            Farmer leader = this.setByWhom;
+            GameLocation location = leader.currentLocation;
             string question = this.StateMachine.ContentLoader.LoadString("Strings/Strings:recruitedWant");
             Response[] responses =
             {
@@ -309,7 +321,7 @@ namespace NpcAdventure.StateMachine.State
             if (speakedDialogue == this.dismissalDialogue)
             {
                 // After companion speaked a dismissal dialogue dismiss (unrecruit) companion who speaked that
-                this.StateMachine.Dismiss(Game1.timeOfDay >= 2200);
+                this.StateMachine.Dismiss(Game1.timeOfDay >= 2200, null);
             }
         }
     }

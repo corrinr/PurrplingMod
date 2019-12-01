@@ -10,6 +10,7 @@ using Harmony;
 using System.Reflection;
 using NpcAdventure.Events;
 using NpcAdventure.Model;
+using NpcAdventure.NetCode;
 
 namespace NpcAdventure
 {
@@ -27,11 +28,13 @@ namespace NpcAdventure
         private HintDriver HintDriver { get; set; }
         private StuffDriver StuffDriver { get; set; }
         private ISpecialModEvents SpecialEvents { get; set; }
+        private NetEvents netEvents;
 
         /// <summary>The mod entry point, called after the mod is first loaded.</summary>
         /// <param name="helper">Provides simplified APIs for writing mods.</param>
         public override void Entry(IModHelper helper)
         {
+            this.netEvents = new NetEvents(helper.Multiplayer);
             this.RegisterEvents(helper.Events);
             this.config = helper.ReadConfig<Config>();
 
@@ -56,6 +59,8 @@ namespace NpcAdventure
             events.GameLoop.DayStarted += this.GameLoop_DayStarted;
             events.GameLoop.GameLaunched += this.GameLoop_GameLaunched;
             this.SpecialEvents = new SpecialModEvents();
+
+            this.netEvents.Register(events);
         }
 
         private void GameLoop_GameLaunched(object sender, GameLaunchedEventArgs e)
@@ -64,8 +69,11 @@ namespace NpcAdventure
             this.HintDriver = new HintDriver(this.Helper.Events);
             this.StuffDriver = new StuffDriver(this.Helper.Data, this.Monitor);
             this.contentLoader = new ContentLoader(this.Helper.Content, this.Helper.ContentPacks, this.ModManifest.UniqueID, "assets", this.Helper.DirectoryPath, this.Monitor);
-            this.companionManager = new CompanionManager(this.DialogueDriver, this.HintDriver, this.config, this.Monitor);
+            this.companionManager = new CompanionManager(this.DialogueDriver, this.HintDriver, this.config, this.Monitor, this.netEvents);
             this.StuffDriver.RegisterEvents(this.Helper.Events);
+            this.netEvents.RegisterCompanionManager(this.companionManager);
+
+            this.netEvents.SetUp(this.companionManager);
         }
 
         private void Specialized_LoadStageChanged(object sender, LoadStageChangedEventArgs e)

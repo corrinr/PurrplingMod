@@ -43,7 +43,7 @@ namespace NpcAdventure.Driver
                 return;
 
             Vector2 cursorTile = e.OldPosition.Tile;
-            GameLocation location = Game1.currentLocation;
+            GameLocation location = Game1.player.currentLocation;
             NPC n = location.isCharacterAtTile(cursorTile);
 
             if (n == null)
