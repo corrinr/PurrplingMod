@@ -13,6 +13,7 @@ using StardewModdingAPI.Events;
 using StardewValley;
 using StardewValley.Locations;
 using StardewValley.Objects;
+using static NpcAdventure.NetCode.NetEvents;
 
 namespace NpcAdventure.StateMachine
 {
@@ -113,10 +114,11 @@ namespace NpcAdventure.StateMachine
             // Convert state to dialogue detector (if state implements it)
             IDialogueDetector detector = this.currentState as IDialogueDetector;
 
-            if (detector != null)
+            // TODO check if we can remove this cmopletely?
+            /*if (detector != null)
             {
-                detector.OnDialogueSpeaked(speakedDialogue); // Handle this dialogue
-            }
+                detector.OnDialogueSpeaked(speakedDialogue.); // Handle this dialogue
+            }*/
         }
 
         /// <summary>
@@ -124,6 +126,9 @@ namespace NpcAdventure.StateMachine
         /// </summary>
         public void NewDaySetup()
         {
+            if (!Game1.IsMasterGame)
+                return;
+
             if (this.CurrentStateFlag != StateFlag.RESET)
                 throw new InvalidStateException($"State machine {this.Name} must be in reset state!");
 
@@ -131,7 +136,7 @@ namespace NpcAdventure.StateMachine
             if (Utility.isFestivalDay(Game1.dayOfMonth, Game1.currentSeason))
             {
                 this.Monitor.Log($"{this.Name} is unavailable to recruit due to festival today.");
-                this.MakeUnavailable(null);
+                this.MakeUnavailable();
                 return;
             }
 
@@ -143,7 +148,7 @@ namespace NpcAdventure.StateMachine
                 DialogueHelper.SetupCompanionDialogues(this.Companion, this.ContentLoader.LoadStrings($"Dialogue/{this.Name}Spouse"));
 
             this.RecruitedToday = false;
-            this.MakeAvailable(null);
+            this.MakeAvailable();
         }
 
         /// <summary>
@@ -212,6 +217,11 @@ namespace NpcAdventure.StateMachine
         /// </summary>
         public void MakeAvailable(Farmer byWhom = null)
         {
+            this.CompanionManager.netEvents.FireEvent(new CompanionChangedState(this.Companion, StateFlag.AVAILABLE, byWhom), null, true);
+        }
+
+        public void MakeLocalAvailable(Farmer byWhom = null)
+        {
             this.ChangeState(StateFlag.AVAILABLE, byWhom);
         }
 
@@ -220,6 +230,11 @@ namespace NpcAdventure.StateMachine
         /// </summary>
         public void MakeUnavailable(Farmer byWhom = null)
         {
+            this.CompanionManager.netEvents.FireEvent(new CompanionChangedState(this.Companion, StateFlag.UNAVAILABLE, byWhom), null, true);
+        }
+
+        public void MakeLocalUnavailable(Farmer byWhom = null)
+        {
             this.ChangeState(StateFlag.UNAVAILABLE, byWhom);
         }
 
@@ -227,6 +242,12 @@ namespace NpcAdventure.StateMachine
         /// Reset companion's state machine
         /// </summary>
         public void ResetStateMachine(Farmer byWhom = null)
+        {
+            if (Game1.IsMasterGame)
+              this.CompanionManager.netEvents.FireEvent(new CompanionChangedState(this.Companion, StateFlag.RESET, byWhom), null, true);
+        }
+
+        public void ResetLocalStateMachine(Farmer byWhom = null)
         {
             this.ChangeState(StateFlag.RESET, byWhom);
         }
@@ -243,7 +264,8 @@ namespace NpcAdventure.StateMachine
                 integrator.ReintegrateCompanionNPC();
 
             this.BackedupSchedule = null;
-            this.ChangeState(StateFlag.UNAVAILABLE, byWhom);
+            //this.ChangeState(StateFlag.UNAVAILABLE, byWhom);
+            this.MakeUnavailable(byWhom); // TODO make sure that somebody else when asked gets the message that the NPC has already been claimed today
             this.CompanionManager.CompanionDissmised(keepUnavailableOthers);
         }
 
@@ -261,6 +283,11 @@ namespace NpcAdventure.StateMachine
                 this.Companion.setTileLocation(this.Companion.GetGrabTile());
             }
 
+            this.CompanionManager.netEvents.FireEvent(new CompanionChangedState(this.Companion, StateFlag.RECRUITED, byWhom), null, true);
+        }
+
+        public void RecruitLocally(Farmer byWhom)
+        {
             this.ChangeState(StateFlag.RECRUITED, byWhom);
             this.CompanionManager.CompanionRecuited(this.Companion.Name, byWhom);
         }

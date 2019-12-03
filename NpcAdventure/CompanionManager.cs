@@ -197,8 +197,8 @@ namespace NpcAdventure
                     [StateFlag.UNAVAILABLE] = new UnavailableState(csm, gameEvents, this.monitor),
                 };
 
-                csm.Setup(stateHandlers);
                 this.PossibleCompanions.Add(npcName, csm);
+                csm.Setup(stateHandlers);
             }
 
             this.monitor.Log($"Initalized {this.PossibleCompanions.Count} companions.", LogLevel.Info);

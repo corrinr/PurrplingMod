@@ -54,7 +54,10 @@ namespace NpcAdventure.StateMachine
         {
             if (e.Player != Game1.MasterPlayer) // send to the server when we change location and we're not server
             {
-                this.StateMachine.CompanionManager.netEvents.FireEvent(new PlayerWarpedEvent(this.StateMachine.Companion, e.OldLocation, e.NewLocation));
+                if (this.StateMachine.Companion != null)
+                {
+                    this.StateMachine.CompanionManager.netEvents.FireEvent(new PlayerWarpedEvent(this.StateMachine.Companion, e.OldLocation, e.NewLocation));
+                }
             }
         }
 

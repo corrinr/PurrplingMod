@@ -54,7 +54,6 @@ namespace NpcAdventure.StateMachine.State
                         new Point((int)companion.DefaultPosition.X, (int)companion.DefaultPosition.Y);
                 }
             }
-            Game1.fadeScreenToBlack();
             companion.faceTowardFarmerTimer = 0;
             this.DelayedWarp(this.companionRescheduleDestinationLocation,
                 this.companionRescheduleDestinationPoint, 500, new Action(this.CompanionEndCleanup));

@@ -38,7 +38,11 @@ namespace NpcAdventure.StateMachine.State
         public override void Entry(Farmer byWhom)
         {
             this.setByWhom = byWhom;
-            this.ai = new AI_StateMachine(this.StateMachine, this.setByWhom, this.Events, this.monitor);
+            
+            if (Game1.IsMasterGame)
+            {
+                this.ai = new AI_StateMachine(this.StateMachine, this.setByWhom, this.Events, this.monitor);
+            }
 
             if (this.StateMachine.Companion.doingEndOfRouteAnimation.Value)
                 this.FinishScheduleAnimation();
@@ -52,11 +56,15 @@ namespace NpcAdventure.StateMachine.State
             this.StateMachine.Companion.eventActor = true;
             this.StateMachine.Companion.farmerPassesThrough = true;
 
-            this.Events.GameLoop.UpdateTicked += this.GameLoop_UpdateTicked;
-            this.Events.GameLoop.TimeChanged += this.GameLoop_TimeChanged;
             this.Events.Player.Warped += this.Player_Warped;
             this.Events.Display.RenderingHud += this.Display_RenderingHud;
             this.SpecialEvents.RenderedLocation += this.SpecialEvents_RenderedLocation;
+
+            if (Game1.IsMasterGame)
+            {
+                this.Events.GameLoop.UpdateTicked += this.GameLoop_UpdateTicked;
+                this.Events.GameLoop.TimeChanged += this.GameLoop_TimeChanged;
+            }
 
             if (this.BuffManager.HasAssignableBuffs())
                 this.BuffManager.AssignBuffs();
@@ -67,12 +75,18 @@ namespace NpcAdventure.StateMachine.State
                 this.StateMachine.Companion.setNewDialogue(dialogueText);
             this.CanCreateDialogue = true;
 
-            this.ai.Setup();
+            if (Game1.IsMasterGame)
+            {
+                this.ai.Setup();
+            }
         }
 
         private void SpecialEvents_RenderedLocation(object sender, ILocationRenderedEventArgs e)
         {
-            this.ai.Draw(e.SpriteBatch);
+            if (this.ai != null)
+            {
+                this.ai.Draw(e.SpriteBatch);
+            }
         }
 
         private void Display_RenderingHud(object sender, RenderingHudEventArgs e)
@@ -153,7 +167,10 @@ namespace NpcAdventure.StateMachine.State
         public override void Exit()
         {
             this.BuffManager.ReleaseBuffs();
-            this.ai.Dispose();
+            if (this.ai != null)
+            {
+                this.ai.Dispose();
+            }
 
             this.StateMachine.Companion.eventActor = false;
             this.StateMachine.Companion.farmerPassesThrough = false;
@@ -217,12 +234,14 @@ namespace NpcAdventure.StateMachine.State
         public void PlayerHasWarped(GameLocation from, GameLocation to)
         {
             NPC companion = this.StateMachine.Companion;
-            Farmer farmer = this.setByWhom;
             Dictionary<string, string> bubbles = this.StateMachine.ContentLoader.LoadStrings("Strings/SpeechBubbles");
 
             // Warp companion to farmer if it's needed
             if (companion.currentLocation != to)
+            {
+                NpcAdventureMod.GameMonitor.Log("Warping NPC " + this.StateMachine.Companion.Name + " to a new location " + to.Name);
                 this.ai.ChangeLocation(to);
+            }
 
             // Show above head bubble text for location
             if (Game1.random.NextDouble() > 66f && DialogueHelper.GetBubbleString(bubbles, companion, to, out string bubble))
@@ -234,13 +253,7 @@ namespace NpcAdventure.StateMachine.State
 
         private void Player_Warped(object sender, WarpedEventArgs e)
         {
-            if (e.Player != Game1.MasterPlayer) // send to the server when we change location and we're not server
-            {
-                this.StateMachine.CompanionManager.netEvents.FireEvent(new PlayerWarpedEvent(this.StateMachine.Companion, e.OldLocation, e.NewLocation));
-                return;
-            }
-
-            this.PlayerHasWarped(e.OldLocation, e.NewLocation);
+            this.StateMachine.CompanionManager.netEvents.FireEvent(new PlayerWarpedEvent(this.StateMachine.Companion, e.OldLocation, e.NewLocation));
         }
 
         private bool TryPushLocationDialogue(GameLocation location)
@@ -280,8 +293,6 @@ namespace NpcAdventure.StateMachine.State
             if (this.ai != null && this.ai.PerformAction())
                 return;
 
-            Farmer leader = this.setByWhom;
-            GameLocation location = leader.currentLocation;
             string[] answers = { "bag", "dismiss", "nothing" };
 
             this.StateMachine.CompanionManager.netEvents.FireEvent(new QuestionEvent("recruitedWant", this.StateMachine.Companion, answers), this.setByWhom);
@@ -315,7 +326,8 @@ namespace NpcAdventure.StateMachine.State
                         break;
                     case "dismiss":
                         this.StateMachine.CompanionManager.netEvents.FireEvent(new DialogEvent("companionDismiss", this.StateMachine.Companion), this.setByWhom);
-                        this.StateMachine.Dismiss(Game1.timeOfDay >= 2200);
+                        this.StateMachine.CompanionManager.netEvents.FireEvent(new CompanionDismissEvent(this.StateMachine.Companion), Game1.MasterPlayer);
+                        Game1.fadeScreenToBlack();
                         break;
                     case "bag": // TODO move to server syncing somehow, no idea how this works!
                         Chest bag = this.StateMachine.Bag;

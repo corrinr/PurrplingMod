@@ -6,6 +6,7 @@ using StardewModdingAPI.Events;
 using StardewValley;
 using System;
 using System.Collections.Generic;
+using static NpcAdventure.StateMachine.CompanionStateMachine;
 
 namespace NpcAdventure.NetCode
 {
@@ -31,13 +32,17 @@ namespace NpcAdventure.NetCode
                 {"companionRequest", new NetEventRecruitNPC(manager)},
                 {PlayerWarpedEvent.EVENTNAME, new NetEventPlayerWarped(manager)},
                 {DialogueRequestEvent.EVENTNAME, new NetEventDialogueRequest(manager)},
-                {QuestionEvent.EVENTNAME, new NetEventQuestionRequest(manager)},
+                {QuestionEvent.EVENTNAME, new NetEventQuestionRequest(manager, this)},
+                {QuestionResponse.EVENTNAME, new NetEventQuestionResponse(manager)},
+                {CompanionChangedState.EVENTNAME, new NetEventCompanionChangedState(manager)},
+                {CompanionStateRequest.EVENTNAME, new NetEventCompanionStateRequest(manager, this)},
+                {CompanionDismissEvent.EVENTNAME, new NetEventDismissNPC(manager)},
             };
         }
 
         private abstract class NetEventProcessor
         {
-            public abstract NpcSyncEvent Process(NpcSyncEvent myEvent);
+            public abstract void Process(NpcSyncEvent myEvent, Farmer owner);
             public abstract NpcSyncEvent Decode(ModMessageReceivedEventArgs e);
         }
 
@@ -48,18 +53,15 @@ namespace NpcAdventure.NetCode
             {
                 this.manager = manager;
             }
-            public override NpcSyncEvent Process(NpcSyncEvent npcEvent)
+            public override void Process(NpcSyncEvent npcEvent, Farmer owner)
             {
                 DialogEvent dialogEvent = (DialogEvent)npcEvent;
                 this.manager.PossibleCompanions[dialogEvent.otherNpc].currentState.ShowDialogue(dialogEvent.Dialog);
-
-                return null;
             }
 
             public override NpcSyncEvent Decode(ModMessageReceivedEventArgs e)
             {
                 DialogEvent myEvent = e.ReadAs<DialogEvent>();
-                myEvent.owner = Game1.getFarmer(e.FromPlayerID);
                 return myEvent;
             }
         }
@@ -72,21 +74,44 @@ namespace NpcAdventure.NetCode
                 this.manager = manager;
             }
 
-            public override NpcSyncEvent Process(NpcSyncEvent myEvent)
+            public override void Process(NpcSyncEvent myEvent, Farmer owner)
             {
                 CompanionRequestEvent reqEvent = (CompanionRequestEvent)myEvent;
                 ICompanionState n = this.manager.PossibleCompanions[reqEvent.otherNpc].currentState;
                 if (n is AvailableState availableState)
                 {
-                    availableState.Recruit(reqEvent.owner);
+                    availableState.Recruit(owner);
                 }
-
-                return null;
             }
 
             public override NpcSyncEvent Decode(ModMessageReceivedEventArgs e)
             {
                 return e.ReadAs<CompanionRequestEvent>();
+            }
+        }
+
+        private class NetEventDismissNPC : NetEventProcessor
+        {
+            private CompanionManager manager;
+
+            public NetEventDismissNPC(CompanionManager manager)
+            {
+                this.manager = manager;
+            }
+
+            public override void Process(NpcSyncEvent myEvent, Farmer owner)
+            {
+                CompanionDismissEvent cde = (CompanionDismissEvent)myEvent;
+                ICompanionState n = this.manager.PossibleCompanions[cde.otherNpc].currentState;
+                if (n is RecruitedState rs)
+                {
+                    rs.StateMachine.Dismiss(true, owner);
+                }
+            }
+
+            public override NpcSyncEvent Decode(ModMessageReceivedEventArgs e)
+            {
+                return e.ReadAs<CompanionDismissEvent>();
             }
         }
 
@@ -103,18 +128,18 @@ namespace NpcAdventure.NetCode
                 return e.ReadAs<PlayerWarpedEvent>();
             }
 
-            public override NpcSyncEvent Process(NpcSyncEvent myEvent)
+            public override void Process(NpcSyncEvent myEvent, Farmer owner)
             {
                 PlayerWarpedEvent pwe = (PlayerWarpedEvent)myEvent;
                 ICompanionState n = this.manager.PossibleCompanions[pwe.npc].currentState;
-                if(n is RecruitedState recruitedState)
-                {
+                if(n is RecruitedState recruitedState && n.GetByWhom().uniqueMultiplayerID == owner.uniqueMultiplayerID)
+                { 
+                    NpcAdventureMod.GameMonitor.Log("Dispatching player warped to a recruited state...");
+
                     GameLocation from = Game1.getLocationFromName(pwe.warpedFrom);
                     GameLocation to = Game1.getLocationFromName(pwe.warpedTo);
                     recruitedState.PlayerHasWarped(from, to);
                 }
-
-                return null;
             }
         }
 
@@ -130,43 +155,42 @@ namespace NpcAdventure.NetCode
                 return e.ReadAs<DialogueRequestEvent>();
             }
 
-            public override NpcSyncEvent Process(NpcSyncEvent myEvent)
+            public override void Process(NpcSyncEvent myEvent, Farmer owner)
             {
                 DialogueRequestEvent dre = (DialogueRequestEvent)myEvent;
                 (this.manager.PossibleCompanions[dre.npc].currentState as IRequestedDialogueCreator).CreateRequestedDialogue();
-
-                return null;
             }
         }
 
         private class NetEventQuestionRequest : NetEventProcessor
         {
             private CompanionManager manager;
+            private NetEvents netbus;
 
-            public NetEventQuestionRequest(CompanionManager manager)
+            public NetEventQuestionRequest(CompanionManager manager, NetEvents events)
             {
                 this.manager = manager;
+                this.netbus = events;
             }
             public override NpcSyncEvent Decode(ModMessageReceivedEventArgs e)
             {
                 return e.ReadAs<QuestionEvent>();
             }
 
-            public override NpcSyncEvent Process(NpcSyncEvent myEvent)
+            public override void Process(NpcSyncEvent myEvent, Farmer owner)
             {
                 QuestionEvent qe = (QuestionEvent)myEvent;
                 Response[] responses = new Response[qe.answers.Length];
-                for(int i = 0; i < qe.answers.Length; i++)
+                for (int i = 0; i < qe.answers.Length; i++)
                 {
                     responses[i] = new Response(qe.answers[i], qe.answers[i]);
                 }
 
-                NpcSyncEvent response = null;
-                NPC n = this.manager.PossibleCompanions[qe.otherNpc].Companion;
+                NPC n = this.manager.PossibleCompanions[qe.npc].Companion;
 
-                qe.owner.currentLocation.createQuestionDialogue(qe.Dialog, responses, (_, answer) => response = new QuestionResponse(answer, n), n);
-
-                return response;
+                owner.currentLocation.createQuestionDialogue(qe.question, responses, (_, answer) => {
+                    this.netbus.FireEvent(new QuestionResponse(qe.question, answer, n), owner);
+                }, n);
             }
         }
 
@@ -184,25 +208,110 @@ namespace NpcAdventure.NetCode
                 return e.ReadAs<QuestionResponse>();
             }
 
-            public override NpcSyncEvent Process(NpcSyncEvent myEvent)
+            public override void Process(NpcSyncEvent myEvent, Farmer owner)
             {
                 QuestionResponse qr = (QuestionResponse)myEvent;
 
                 IDialogueDetector detector = this.manager.PossibleCompanions[qr.npc].currentState as IDialogueDetector;
                 if (detector != null) {
-                    detector.OnDialogueSpeaked(qr.response);
+                    detector.OnDialogueSpeaked(qr.question, qr.response);
+                }
+            }
+        }
+
+        private class NetEventCompanionStateRequest : NetEventProcessor
+        {
+            private CompanionManager manager;
+            private NetEvents netBus;
+
+            public NetEventCompanionStateRequest(CompanionManager manager, NetEvents netBus)
+            {
+                this.manager = manager;
+                this.netBus = netBus;
+            }
+
+            public override NpcSyncEvent Decode(ModMessageReceivedEventArgs e)
+            {
+                return e.ReadAs<CompanionStateRequest>();
+            }
+
+            public override void Process(NpcSyncEvent myEvent, Farmer owner)
+            {
+                foreach(var csmkv in this.manager.PossibleCompanions)
+                {
+                    this.netBus.FireEvent(new CompanionChangedState(csmkv.Value.Companion, csmkv.Value.CurrentStateFlag, csmkv.Value.currentState.GetByWhom()), owner);
+                }
+            }
+        }
+
+        private class NetEventCompanionChangedState : NetEventProcessor
+        {
+            private CompanionManager manager;
+
+            public NetEventCompanionChangedState(CompanionManager manager)
+            {
+                this.manager = manager;
+            }
+
+            public override NpcSyncEvent Decode(ModMessageReceivedEventArgs e)
+            {
+                return e.ReadAs<CompanionChangedState>();
+            }
+
+            public override void Process(NpcSyncEvent myEvent, Farmer owner)
+            {
+                CompanionChangedState ccs = (CompanionChangedState)myEvent;
+                CompanionStateMachine n = manager.PossibleCompanions[ccs.npc];
+                switch(ccs.NewState)
+                {
+                    case StateFlag.AVAILABLE:
+                        n.MakeLocalAvailable(ccs.GetByWhom());
+                        break;
+                    case StateFlag.RECRUITED:
+                        n.RecruitLocally(ccs.GetByWhom());
+                        break;
+                    case StateFlag.RESET:
+                        n.ResetLocalStateMachine(ccs.GetByWhom());
+                        break;
+                    case StateFlag.UNAVAILABLE:
+                        n.MakeLocalUnavailable(ccs.GetByWhom());
+                        break;
+                    default:
+
+                        break;
                 }
 
-                return null;
             }
         }
 
         public void Register(IModEvents events)
         {
             events.Multiplayer.ModMessageReceived += this.OnMessageReceived;
+            events.Specialized.LoadStageChanged += this.OnLoadStageChanged;
         }
 
-        public void FireEvent(NpcSyncEvent myEvent, Farmer toWhom = null) {
+        private void OnLoadStageChanged(object sender, LoadStageChangedEventArgs e)
+        {
+            if(Context.IsMultiplayer && e.NewStage == StardewModdingAPI.Enums.LoadStage.Ready && !Game1.IsMasterGame)
+            {
+                this.FireEvent(new CompanionStateRequest());
+            }
+        }
+
+        public void FireEvent(NpcSyncEvent myEvent, Farmer toWhom = null, bool isBroadcast = false) {
+            if (isBroadcast)
+            {
+                foreach (Farmer farmer in Game1.getOnlineFarmers())
+                {
+                    if (farmer != Game1.player) // don't fire to the current player as it overwrites some fields as it is not a copy of the message
+                        FireEvent(myEvent, farmer);
+                }
+
+                FireEvent(myEvent, Game1.player);
+
+                return;
+            }
+
             if (toWhom == null)
             {
                 toWhom = Game1.MasterPlayer;
@@ -215,13 +324,9 @@ namespace NpcAdventure.NetCode
             }
             else
             {
+                NpcAdventureMod.GameMonitor.Log("Delivering message" + myEvent.Name);
                 NetEventProcessor eventProcessor = this.messages[myEvent.Name];
-                myEvent.owner = Game1.MasterPlayer;
-                NpcSyncEvent response = eventProcessor.Process(myEvent);
-                if (response != null)
-                {
-                    this.FireEvent(response, myEvent.owner);
-                }
+                eventProcessor.Process(myEvent, Game1.player);
             }
         }
 
@@ -234,15 +339,14 @@ namespace NpcAdventure.NetCode
         {
             NetEventProcessor processor = messages[e.Type];
             NpcSyncEvent npcEvent = processor.Decode(e);
-            npcEvent.owner = Game1.getFarmer(e.FromPlayerID);
-            NpcAdventureMod.GameMonitor.Log("Received message " + npcEvent.Name + " from " + npcEvent.owner.Name, LogLevel.Info);
-            processor.Process(npcEvent);
+            Farmer owner = Game1.getFarmer(e.FromPlayerID);
+            NpcAdventureMod.GameMonitor.Log("Received message " + npcEvent.Name + " from " + owner.Name, LogLevel.Info);
+            processor.Process(npcEvent, owner);
         }
 
         public abstract class NpcSyncEvent
         {
             public String Name;
-            public Farmer owner;
 
             public NpcSyncEvent() { }
 
@@ -280,19 +384,23 @@ namespace NpcAdventure.NetCode
             }
         }
 
-        public class QuestionEvent : DialogEvent
+        public class QuestionEvent : NpcSyncEvent
         {
             public const string EVENTNAME = "questionRequest";
 
             public string[] answers;
+            public string question;
+            public string npc;
 
             public QuestionEvent() : base()
             {
 
             }
 
-            public QuestionEvent(string name, string dialog, NPC otherNpc, string[] answers) : base(name, dialog, otherNpc)
+            public QuestionEvent(string dialog, NPC otherNpc, string[] answers) : base(EVENTNAME)
             {
+                this.question = dialog;
+                this.npc = otherNpc.Name;
                 this.answers = answers;
             }
         }
@@ -300,6 +408,7 @@ namespace NpcAdventure.NetCode
         public class QuestionResponse : NpcSyncEvent
         {
             public const string EVENTNAME = "questionResponse";
+            public string question;
             public string response;
             public string npc;
             public QuestionResponse()
@@ -307,8 +416,9 @@ namespace NpcAdventure.NetCode
 
             }
 
-            public QuestionResponse(string response, NPC n) : base(EVENTNAME)
+            public QuestionResponse(string question, string response, NPC n) : base(EVENTNAME)
             {
+                this.question = question;
                 this.npc = n.Name;
                 this.response = response;
             }
@@ -327,6 +437,19 @@ namespace NpcAdventure.NetCode
 
         }
 
+        public class CompanionDismissEvent : NpcSyncEvent
+        {
+            public const string EVENTNAME = "companionDismiss";
+            public string otherNpc;
+
+            public CompanionDismissEvent() { }
+
+            public CompanionDismissEvent(NPC otherNpc) : base(EVENTNAME)
+            {
+                this.otherNpc = otherNpc.Name;
+            }
+        }
+
         public class PlayerWarpedEvent : NpcSyncEvent
         {
             public const string EVENTNAME = "playerWarped";
@@ -341,6 +464,40 @@ namespace NpcAdventure.NetCode
                 this.warpedTo = to.NameOrUniqueName;
                 this.npc = n.Name;
             }
+        }
+
+        public class CompanionChangedState : NpcSyncEvent
+        {
+            public const string EVENTNAME = "companionChangedState";
+            public StateFlag NewState;
+            public long byWhom;
+            public string npc;
+
+            public Farmer GetByWhom()
+            {
+                if (this.byWhom == 0)
+                    return null;
+
+                return Game1.getFarmer(this.byWhom);
+            }
+
+            public CompanionChangedState() { }
+
+            public CompanionChangedState(NPC n, StateFlag NewState, Farmer byWhom) : base(EVENTNAME)
+            {
+                this.npc = n.Name;
+                this.NewState = NewState;
+                if (byWhom != null)
+                  this.byWhom = byWhom.uniqueMultiplayerID;
+            }
+        }
+
+        public class CompanionStateRequest : NpcSyncEvent
+        {
+            public const string EVENTNAME = "companionStateRequest";
+
+            public CompanionStateRequest() : base(EVENTNAME) { }
+
         }
         /*
         public class CompanionResultEvent : DialogEvent

@@ -25,10 +25,24 @@ namespace NpcAdventure.StateMachine.State
             this.setByWhom = byWhom;
             this.CanCreateDialogue = true;
             this.Events.GameLoop.TimeChanged += this.GameLoop_TimeChanged;
+            if(Game1.IsMasterGame)
+            {
+                this.Events.GameLoop.TimeChanged += this.GameLoop_TimeChanged_Server;
+            }
         }
 
         private void GameLoop_TimeChanged(object sender, TimeChangedEventArgs e)
         {
+
+        }
+
+        private void GameLoop_TimeChanged_Server(object sender, TimeChangedEventArgs e)
+        {
+            if (this.StateMachine.CompanionManager == null)
+            {
+                return;
+            }
+
             if (this.CanCreateDialogue == false && e.NewTime > this.doNotAskUntil)
                 this.CanCreateDialogue = true;
 
@@ -116,14 +130,15 @@ namespace NpcAdventure.StateMachine.State
 
             foreach (var csmKv in this.StateMachine.CompanionManager.PossibleCompanions)
             {
-                if (byWhom.uniqueMultiplayerID == csmKv.Value.currentState.GetByWhom().uniqueMultiplayerID && csmKv.Value.CurrentStateFlag != CompanionStateMachine.StateFlag.RECRUITED) // if the person is already taken by us
+                if (csmKv.Value.currentState.GetByWhom() != null && byWhom.uniqueMultiplayerID == csmKv.Value.currentState.GetByWhom().uniqueMultiplayerID && csmKv.Value.CurrentStateFlag == CompanionStateMachine.StateFlag.RECRUITED) // if the person is already taken by us
                 {
                     this.StateMachine.CompanionManager.netEvents.FireEvent(new DialogEvent("companionYoureNotFree", n));
                     return;
                 } 
-                else if (byWhom.uniqueMultiplayerID == csmKv.Value.currentState.GetByWhom().uniqueMultiplayerID && csmKv.Value.CurrentStateFlag == CompanionStateMachine.StateFlag.RECRUITED) // HACK remove when we get rclick event syncing
+                else if (csmKv.Value.currentState.GetByWhom() != null && byWhom.uniqueMultiplayerID == csmKv.Value.currentState.GetByWhom().uniqueMultiplayerID && csmKv.Value.CurrentStateFlag == CompanionStateMachine.StateFlag.RECRUITED) // TODO remove when we get rclick event syncing
                 {
-                    this.StateMachine.CompanionManager.netEvents.FireEvent(new DialogEvent( "recruitedWant", n));
+                    this.StateMachine.CompanionManager.netEvents.FireEvent(new DialogEvent("recruitedWant", n));
+                    return;
                 }
             }
 
@@ -160,6 +175,11 @@ namespace NpcAdventure.StateMachine.State
         public void OnDialogueSpeaked(string question, string answer) // XXXX taky jenom na serveru
         {
 
+        }
+
+        public void CreateRequestedDialogue()
+        {
+            CreateRequestedDialogue(null);
         }
     }
 }
