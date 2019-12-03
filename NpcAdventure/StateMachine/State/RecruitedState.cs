@@ -35,8 +35,9 @@ namespace NpcAdventure.StateMachine.State
             this.SpecialEvents = specialEvents;
         }
 
-        public override void Entry()
+        public override void Entry(Farmer byWhom)
         {
+            this.setByWhom = byWhom;
             this.ai = new AI_StateMachine(this.StateMachine, this.setByWhom, this.Events, this.monitor);
 
             if (this.StateMachine.Companion.doingEndOfRouteAnimation.Value)
@@ -281,6 +282,11 @@ namespace NpcAdventure.StateMachine.State
 
             Farmer leader = this.setByWhom;
             GameLocation location = leader.currentLocation;
+            string[] answers = { "bag", "dismiss", "nothing" };
+
+            this.StateMachine.CompanionManager.netEvents.FireEvent(new QuestionEvent("recruitedWant", this.StateMachine.Companion, answers), this.setByWhom);
+            
+            /*
             string question = this.StateMachine.ContentLoader.LoadString("Strings/Strings:recruitedWant");
             Response[] responses =
             {
@@ -296,32 +302,27 @@ namespace NpcAdventure.StateMachine.State
                     this.StateMachine.Companion.facePlayer(leader);
                     this.ReactOnAsk(this.StateMachine.Companion, leader, answer);
                 }
-            }, this.StateMachine.Companion);
+            }, this.StateMachine.Companion);*/
         }
 
-        private void ReactOnAsk(NPC companion, Farmer leader, string action)
+        public void OnDialogueSpeaked(string question, string response)
         {
-            switch (action)
+            if(question == "recruitedWant")
             {
-                case "dismiss":
-                    Dialogue dismissalDialogue = new Dialogue(DialogueHelper.GetDialogueString(companion, "companionDismiss"), companion);
-                    this.dismissalDialogue = dismissalDialogue;
-                    DialogueHelper.DrawDialogue(dismissalDialogue);
-                    break;
-                case "bag":
-                    Chest bag = this.StateMachine.Bag;
-                    this.StateMachine.Companion.currentLocation.playSound("openBox");
-                    Game1.activeClickableMenu = new ItemGrabMenu(bag.items, false, true, new InventoryMenu.highlightThisItem(InventoryMenu.highlightAllItems), new ItemGrabMenu.behaviorOnItemSelect(bag.grabItemFromInventory), this.StateMachine.Companion.displayName, new ItemGrabMenu.behaviorOnItemSelect(bag.grabItemFromChest), false, true, true, true, true, 1, null, -1, this.StateMachine.Companion);
-                    break;
-            }
-        }
-
-        public void OnDialogueSpeaked(Dialogue speakedDialogue)
-        {
-            if (speakedDialogue == this.dismissalDialogue)
-            {
-                // After companion speaked a dismissal dialogue dismiss (unrecruit) companion who speaked that
-                this.StateMachine.Dismiss(Game1.timeOfDay >= 2200, null);
+                switch(response)
+                {
+                    case "nothing":
+                        break;
+                    case "dismiss":
+                        this.StateMachine.CompanionManager.netEvents.FireEvent(new DialogEvent("companionDismiss", this.StateMachine.Companion), this.setByWhom);
+                        this.StateMachine.Dismiss(Game1.timeOfDay >= 2200);
+                        break;
+                    case "bag": // TODO move to server syncing somehow, no idea how this works!
+                        Chest bag = this.StateMachine.Bag;
+                        this.StateMachine.Companion.currentLocation.playSound("openBox");
+                        Game1.activeClickableMenu = new ItemGrabMenu(bag.items, false, true, new InventoryMenu.highlightThisItem(InventoryMenu.highlightAllItems), new ItemGrabMenu.behaviorOnItemSelect(bag.grabItemFromInventory), this.StateMachine.Companion.displayName, new ItemGrabMenu.behaviorOnItemSelect(bag.grabItemFromChest), false, true, true, true, true, 1, null, -1, this.StateMachine.Companion);
+                        break;
+                }
             }
         }
     }

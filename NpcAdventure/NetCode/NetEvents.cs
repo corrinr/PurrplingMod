@@ -1,5 +1,6 @@
 ﻿using NpcAdventure.StateMachine;
 using NpcAdventure.StateMachine.State;
+using NpcAdventure.StateMachine.StateFeatures;
 using StardewModdingAPI;
 using StardewModdingAPI.Events;
 using StardewValley;
@@ -26,9 +27,11 @@ namespace NpcAdventure.NetCode
         {
             this.messages = new Dictionary<string, NetEventProcessor>()
             {
-                {"showDialogue", new NetEventShowDialogue(manager)},
+                {DialogEvent.EVENTNAME, new NetEventShowDialogue(manager)},
                 {"companionRequest", new NetEventRecruitNPC(manager)},
                 {PlayerWarpedEvent.EVENTNAME, new NetEventPlayerWarped(manager)},
+                {DialogueRequestEvent.EVENTNAME, new NetEventDialogueRequest(manager)},
+                {QuestionEvent.EVENTNAME, new NetEventQuestionRequest(manager)},
             };
         }
 
@@ -115,6 +118,85 @@ namespace NpcAdventure.NetCode
             }
         }
 
+        private class NetEventDialogueRequest : NetEventProcessor
+        {
+            private CompanionManager manager;
+            public NetEventDialogueRequest(CompanionManager manager)
+            {
+                this.manager = manager;
+            }
+            public override NpcSyncEvent Decode(ModMessageReceivedEventArgs e)
+            {
+                return e.ReadAs<DialogueRequestEvent>();
+            }
+
+            public override NpcSyncEvent Process(NpcSyncEvent myEvent)
+            {
+                DialogueRequestEvent dre = (DialogueRequestEvent)myEvent;
+                (this.manager.PossibleCompanions[dre.npc].currentState as IRequestedDialogueCreator).CreateRequestedDialogue();
+
+                return null;
+            }
+        }
+
+        private class NetEventQuestionRequest : NetEventProcessor
+        {
+            private CompanionManager manager;
+
+            public NetEventQuestionRequest(CompanionManager manager)
+            {
+                this.manager = manager;
+            }
+            public override NpcSyncEvent Decode(ModMessageReceivedEventArgs e)
+            {
+                return e.ReadAs<QuestionEvent>();
+            }
+
+            public override NpcSyncEvent Process(NpcSyncEvent myEvent)
+            {
+                QuestionEvent qe = (QuestionEvent)myEvent;
+                Response[] responses = new Response[qe.answers.Length];
+                for(int i = 0; i < qe.answers.Length; i++)
+                {
+                    responses[i] = new Response(qe.answers[i], qe.answers[i]);
+                }
+
+                NpcSyncEvent response = null;
+                NPC n = this.manager.PossibleCompanions[qe.otherNpc].Companion;
+
+                qe.owner.currentLocation.createQuestionDialogue(qe.Dialog, responses, (_, answer) => response = new QuestionResponse(answer, n), n);
+
+                return response;
+            }
+        }
+
+        private class NetEventQuestionResponse : NetEventProcessor
+        {
+            private CompanionManager manager;
+
+            public NetEventQuestionResponse(CompanionManager manager)
+            {
+                this.manager = manager;
+            }
+
+            public override NpcSyncEvent Decode(ModMessageReceivedEventArgs e)
+            {
+                return e.ReadAs<QuestionResponse>();
+            }
+
+            public override NpcSyncEvent Process(NpcSyncEvent myEvent)
+            {
+                QuestionResponse qr = (QuestionResponse)myEvent;
+
+                IDialogueDetector detector = this.manager.PossibleCompanions[qr.npc].currentState as IDialogueDetector;
+                if (detector != null) {
+                    detector.OnDialogueSpeaked(qr.response);
+                }
+
+                return null;
+            }
+        }
+
         public void Register(IModEvents events)
         {
             events.Multiplayer.ModMessageReceived += this.OnMessageReceived;
@@ -135,7 +217,11 @@ namespace NpcAdventure.NetCode
             {
                 NetEventProcessor eventProcessor = this.messages[myEvent.Name];
                 myEvent.owner = Game1.MasterPlayer;
-                eventProcessor.Process(myEvent);
+                NpcSyncEvent response = eventProcessor.Process(myEvent);
+                if (response != null)
+                {
+                    this.FireEvent(response, myEvent.owner);
+                }
             }
         }
 
@@ -167,17 +253,64 @@ namespace NpcAdventure.NetCode
 
         }
 
+        public class DialogueRequestEvent : NpcSyncEvent
+        {
+            public const string EVENTNAME = "dialogueRequestEvent";
+
+            public string npc;
+            public DialogueRequestEvent(NPC n) : base(EVENTNAME)
+            {
+                this.npc = n.Name;
+            }
+        }
+
         public class DialogEvent : NpcSyncEvent
         {
+            public const string EVENTNAME = "showDialogue";
+
             public string Dialog;
             public string otherNpc;
 
             public DialogEvent() { }
 
-            public DialogEvent(String name, string dialog, NPC otherNpc) : base(name)
+            public DialogEvent(string dialog, NPC otherNpc) : base(EVENTNAME)
             {
                 this.Dialog = dialog;
                 this.otherNpc = otherNpc.Name;
+            }
+        }
+
+        public class QuestionEvent : DialogEvent
+        {
+            public const string EVENTNAME = "questionRequest";
+
+            public string[] answers;
+
+            public QuestionEvent() : base()
+            {
+
+            }
+
+            public QuestionEvent(string name, string dialog, NPC otherNpc, string[] answers) : base(name, dialog, otherNpc)
+            {
+                this.answers = answers;
+            }
+        }
+
+        public class QuestionResponse : NpcSyncEvent
+        {
+            public const string EVENTNAME = "questionResponse";
+            public string response;
+            public string npc;
+            public QuestionResponse()
+            {
+
+            }
+
+            public QuestionResponse(string response, NPC n) : base(EVENTNAME)
+            {
+                this.npc = n.Name;
+                this.response = response;
             }
         }
 

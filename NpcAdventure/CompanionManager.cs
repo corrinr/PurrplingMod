@@ -115,13 +115,6 @@ namespace NpcAdventure
         /// <param name="companionName">NPC name of companion</param>
         internal void CompanionRecuited(string companionName, Farmer byWhom)
         {
-            foreach (var csmKv in this.PossibleCompanions)
-            {
-                // All other companions are unavailable now (Player can't recruit them right now)
-                if (csmKv.Value.Name != companionName)
-                    csmKv.Value.MakeUnavailable(byWhom);
-            }
-
             this.monitor.Log($"You are recruited {companionName} companion.");
         }
 

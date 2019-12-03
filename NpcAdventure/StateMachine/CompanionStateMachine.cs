@@ -85,8 +85,7 @@ namespace NpcAdventure.StateMachine
                 this.currentState.Exit();
             }
 
-            newState.SetByWhom(byWhom);
-            newState.Entry();
+            newState.Entry(byWhom);
             this.currentState = newState;
             this.Monitor.Log($"{this.Name} changed state: {this.CurrentStateFlag.ToString()} -> {stateFlag.ToString()}");
             this.CurrentStateFlag = stateFlag;
@@ -282,13 +281,14 @@ namespace NpcAdventure.StateMachine
         /// <summary>
         /// Resolve dialogue request
         /// </summary>
-        public void ResolveDialogueRequest()
+        public void ResolveDialogueRequest(string answer = null)
         {
             // Can this companion to resolve player's dialogue request?
             if (!this.CanDialogueRequestResolve())
                 return;
 
             // Handle dialogue request resolution in current machine state
+            
             (this.currentState as IRequestedDialogueCreator).CreateRequestedDialogue();
         }
 

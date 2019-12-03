@@ -4,6 +4,6 @@ namespace NpcAdventure.StateMachine.StateFeatures
 {
     internal interface IDialogueDetector
     {
-        void OnDialogueSpeaked(Dialogue speakedDialogue);
+        void OnDialogueSpeaked(string question, string answer);
     }
 }

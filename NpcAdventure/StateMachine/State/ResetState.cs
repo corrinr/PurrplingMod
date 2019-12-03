@@ -19,6 +19,11 @@ namespace NpcAdventure.StateMachine.State
         private string companionRescheduleEndRouteDialogue;
         private int companionRescheduleFacingDirection;
 
+        public override void Entry(Farmer byWhom)
+        {
+            this.setByWhom = byWhom;
+        }
+
         public ResetState(CompanionStateMachine stateMachine, IModEvents events, IMonitor monitor) : base(stateMachine, events, monitor)
         {
         }
@@ -26,7 +31,7 @@ namespace NpcAdventure.StateMachine.State
         public void ReintegrateCompanionNPC()
         {
             NPC companion = this.StateMachine.Companion;
-            Farmer farmer = this.StateMachine.CompanionManager.Farmer;
+            Farmer farmer = this.setByWhom;
 
             companion.Schedule = this.GetCompanionSchedule(Game1.dayOfMonth);
             companion.controller = null;
@@ -390,7 +395,7 @@ namespace NpcAdventure.StateMachine.State
         private async void DelayedWarp(String location, Point tileLocation, int milliseconds, Action afterWarpAction)
         {
             await Task.Run(() => this.Timer(milliseconds));
-            location = location != null ? location : this.StateMachine.CompanionManager.Farmer.currentLocation.Name;
+            location = location != null ? location : this.setByWhom.currentLocation.Name;
             //tileLocation = tileLocation != Point.Zero ? tileLocation : stateMachine.manager.farmer.getTileLocationPoint();
             if (this.StateMachine.Companion.currentLocation != null)
                 Game1.warpCharacter(this.StateMachine.Companion, location, tileLocation);
@@ -425,8 +430,8 @@ namespace NpcAdventure.StateMachine.State
                 companion.CurrentDialogue.Push(new Dialogue(Game1.content.LoadString(this.companionRescheduleEndRouteDialogue), companion));
             companion.faceDirection(this.companionRescheduleFacingDirection);
 
-            if (companion.Schedule == null && this.StateMachine.CompanionManager.Farmer.spouse != null &&
-                this.StateMachine.CompanionManager.Farmer.spouse.Equals(companion.Name))
+            if (companion.Schedule == null && this.setByWhom.spouse != null &&
+                this.setByWhom.spouse.Equals(companion.Name))
             {
                 companion.marriageDuties();
             }

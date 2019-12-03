@@ -16,7 +16,7 @@ namespace NpcAdventure.StateMachine
         /// <summary>
         /// Enter to this state
         /// </summary>
-        void Entry();
+        void Entry(Farmer byWhom);
         
         /// <summary>
         /// Exit from this state
@@ -29,7 +29,7 @@ namespace NpcAdventure.StateMachine
         /// <param name="message">Message that was received</param>
         void ShowDialogue(string message);
 
-        void SetByWhom(Farmer byWhom);
+        Farmer GetByWhom();
     }
 
     internal abstract class CompanionState : ICompanionState
@@ -63,15 +63,15 @@ namespace NpcAdventure.StateMachine
             DialogueHelper.DrawDialogue(new Dialogue(message, this.StateMachine.Companion));
         }
 
-        public void SetByWhom(Farmer byWhom)
+        public Farmer GetByWhom()
         {
-            this.setByWhom = byWhom;
+            return this.setByWhom;
         }
 
         /// <summary>
         /// By default do nothing when this state entered
         /// </summary>
-        public virtual void Entry() {}
+        public virtual void Entry(Farmer byWhom) {}
 
         /// <summary>
         /// By default do nothing when this state was exited
