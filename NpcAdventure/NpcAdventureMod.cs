@@ -40,15 +40,6 @@ namespace NpcAdventure
             this.RegisterEvents(helper.Events);
             this.config = helper.ReadConfig<Config>();
 
-            //Harmony
-            HarmonyInstance harmony = HarmonyInstance.Create("Purrplingcat.NpcAdventure");
-            harmony.Patch(
-                original: AccessTools.Method(typeof(GameLocation), "draw"),
-                postfix: new HarmonyMethod(typeof(Patches.GameLocationDrawPatch), nameof(Patches.GameLocationDrawPatch.Postfix))
-            );
-
-            Patches.GameLocationDrawPatch.Setup(harmony, this.SpecialEvents);
-
             NpcAdventureMod.GameMonitor = this.Monitor;
         }
 
@@ -60,7 +51,6 @@ namespace NpcAdventure
             events.GameLoop.DayEnding += this.GameLoop_DayEnding;
             events.GameLoop.DayStarted += this.GameLoop_DayStarted;
             events.GameLoop.GameLaunched += this.GameLoop_GameLaunched;
-            this.SpecialEvents = new SpecialModEvents();
 
             this.netEvents.Register(events);
             events.GameLoop.UpdateTicked += this.GameLoop_UpdateTicked;
@@ -89,9 +79,8 @@ namespace NpcAdventure
             this.companionHud = new CompanionDisplay(this.config, this.contentLoader);
             this.companionManager = new CompanionManager(this.DialogueDriver, this.HintDriver, this.companionHud, this.config, this.Monitor, this.netEvents);
             this.StuffDriver.RegisterEvents(this.Helper.Events);
-            this.netEvents.RegisterCompanionManager(this.companionManager);
 
-            this.netEvents.SetUp(this.companionManager);
+            this.netEvents.SetUp(this.ModManifest, this.companionManager);
             
             //Harmony
             HarmonyInstance harmony = HarmonyInstance.Create("Purrplingcat.NpcAdventure");

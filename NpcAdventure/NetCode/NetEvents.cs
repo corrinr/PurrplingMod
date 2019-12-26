@@ -21,14 +21,19 @@ namespace NpcAdventure.NetCode
 
         private Dictionary<String, NetEventProcessor> messages;
 
+        private IManifest modManifest;
+
         public NetEvents(IMultiplayerHelper helper)
         {
             this.helper = helper;
             
         }
 
-        public void SetUp(CompanionManager manager)
+        public void SetUp(IManifest manifest, CompanionManager manager)
         {
+            this.companionManager = manager;
+            this.modManifest = manifest;
+
             this.messages = new Dictionary<string, NetEventProcessor>()
             {
                 {DialogEvent.EVENTNAME, new NetEventShowDialogue(manager)},
@@ -355,7 +360,7 @@ namespace NpcAdventure.NetCode
             if (Context.IsMultiplayer && toWhom != Game1.player)
             {
                 NpcAdventureMod.GameMonitor.Log("Sending message " + myEvent.Name + " to network", LogLevel.Info);
-                helper.SendMessage<NpcSyncEvent>(myEvent, myEvent.Name, new string[] { "purrplingcat.npcadventure"}, new long[] { toWhom.uniqueMultiplayerID });
+                helper.SendMessage<NpcSyncEvent>(myEvent, myEvent.Name, new string[] {this.modManifest.UniqueID}, new long[] { toWhom.uniqueMultiplayerID });
             }
             else
             {
@@ -363,11 +368,6 @@ namespace NpcAdventure.NetCode
                 NetEventProcessor eventProcessor = this.messages[myEvent.Name];
                 eventProcessor.Process(myEvent, Game1.player);
             }
-        }
-
-        public void RegisterCompanionManager(CompanionManager companionManager)
-        {
-            this.companionManager = companionManager;
         }
 
         private void OnMessageReceived(object sender, ModMessageReceivedEventArgs e)
