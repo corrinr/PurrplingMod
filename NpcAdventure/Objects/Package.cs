@@ -12,6 +12,8 @@ namespace NpcAdventure.Objects
 {
     class Package : Chest
     {
+
+        public Package() { } // empty constructor for net sync for when save game breaks a wee bit
         public Package(List<Item> items, Vector2 location, int giftBoxIndex = 0, string message = null) : base(0, items, location, true, giftBoxIndex)
         {
             this.Message = message;

@@ -4,5 +4,11 @@
   "companionRejectedNight": "It's getting late.",
   "companionDismiss": "I'll see you around.",
   "companionDismissAuto": "I have to go now, it's late and my dog needs feeding.",
-  "companionRecruited": "Awesome!$h Where are we going?$0"
+  "companionRecruited": "Awesome!$h#$b#Where are we going?$0",
+  "companion_Beach": "I always feel energized here!$h",
+  "companion_Farm": "This place has a lot of space for exercising. I like it!",
+  "companion_Farm_Spouse": "It's so good to see how our farm is thriving! We make a great pair, don't you think?$",
+  "companion_Forest": "It's hard to move fast with all these trees and bushes. This place is no fun.$s",
+  "companion_Mine": "This place is meant for strong people. That's why you brought me here, right?$9",
+  "companion_Town": "The town? I thought we were going to explore somewhere interesting...$0"
 }

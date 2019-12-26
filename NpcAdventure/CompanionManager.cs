@@ -14,6 +14,7 @@ using NpcAdventure.Model;
 using Microsoft.Xna.Framework.Graphics;
 using NpcAdventure.Events;
 using NpcAdventure.NetCode;
+using NpcAdventure.HUD;
 
 namespace NpcAdventure
 {
@@ -23,6 +24,7 @@ namespace NpcAdventure
         private readonly HintDriver hintDriver;
         private readonly IMonitor monitor;
         public Dictionary<string, CompanionStateMachine> PossibleCompanions { get; }
+        public CompanionDisplay Hud { get; }
         public Config Config { get; }
         public NetEvents netEvents;
 
@@ -36,10 +38,11 @@ namespace NpcAdventure
             }
         }
 
-        public CompanionManager(DialogueDriver dialogueDriver, HintDriver hintDriver, Config config, IMonitor monitor, NetEvents netEvents)
+        public CompanionManager(DialogueDriver dialogueDriver, HintDriver hintDriver, CompanionDisplay hud, Config config, IMonitor monitor, NetEvents netEvents)
         {
             this.dialogueDriver = dialogueDriver ?? throw new ArgumentNullException(nameof(dialogueDriver));
             this.hintDriver = hintDriver ?? throw new ArgumentNullException(nameof(hintDriver));
+            this.Hud = hud;
             this.monitor = monitor ?? throw new ArgumentNullException(nameof(monitor));
             this.PossibleCompanions = new Dictionary<string, CompanionStateMachine>();
             this.Config = config;

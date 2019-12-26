@@ -1,8 +1,15 @@
 {
-  "companionAccepted": "Tudo bem, mas vamos evitar as minas. Lá é sujo.",
-  "companionRejected": "Parece um tédio..$2",
-  "companionRejectedNight": "Tá muito tarde pra qualquer coisa.$3",
-  "companionDismiss": "...Awww, agora que eu tava me divertindo.#$b#Bem até mais!$h",
-  "companionDismissAuto": "*Yawns*#$4#Descupa @ Estou muito cansada. Te vejo mais tarde.",
-  "companionRecruited": "Yay!#$b#Talvez consiga tirar algumas fotos!$h"
+  "companionAccepted": "Tá bom, mas vamos evitar as minas. Năo quero sujar meu vestido novo.",
+  "companionRejected": "Parece um tédio total..$2",
+  "companionRejectedNight": "Está muito tarde pra fazer qualquer coisa agora.$3",
+  "companionDismiss": "...Awww, agora que eu estava começando a me divertir.#$b#Bem,nos vemos por aí!$h",
+  "companionDismissAuto": "*bocejo*#$4#Desculpa @ eu estou muito cansada. Amanhă a gente se vę.",
+  "companionRecruited": "Yay!#$b#Talvez consiga tirar umas boas fotos hoje!$h",
+  "companion_Beach_summer": "Nós vamos pegar um bronzeado hoje? Que ideia maravilhosa!$h",
+  "companion_Farm": "Vocę tem um monte de suj... terra aqui. É por isso que vocę sempre está meio sujo(a), eu acho.",
+  "companion_Farm_Spouse": "A nossa varanda está suja de novo. Eu deveria… Oh, mas é claro. Hoje nós temos alguns lugares para ir.$h",
+  "companion_Forest": "Aqui parece ter espaço o bastante para eles construírem um shopping.#$b#...$7#$b#O que?$u",
+  "companion_Mine": "Aqui é muito escuro. Ainda bem que já estou acostumada. Olha aonde pisa!",
+  "companion_Mountain": "Esse năo é o lugar ideal pra usar saltos. *suspiro*$s",
+  "companion_Town": "Deixe eu trocar as minhas roupas já que estamos aqui."
 }

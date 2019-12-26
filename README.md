@@ -2,7 +2,7 @@
 
 # It's time to adventure (NPC Adventures)
 
-**WARNING: THIS MOD IS IN ALPHA BUILD!** It may be unstable with some bugs. Found any defect? Report it and help improvement this mod. Any idea? Create a proposal on Github. Thanks.
+**THIS MOD IS IN ALPHA BUILD!** It may be unstable with some bugs. Found any defect? Report it and help improvement this mod. Any idea? Create a proposal on Github. Thanks.
 
 Go to an adventure with Pelican Town's villagers! Recruit bachelorete or bachlor and go to adventure togehter.
 
@@ -23,7 +23,7 @@ Go to an adventure with Pelican Town's villagers! Recruit bachelorete or bachlor
 - Display personal skills in HUD (with mouseover tooltip)
 - Better critical defense fist fight animation and sound
 - [NEW] Support for content packs and localizations. You can add custom NPC as companion (see [how to create content pack](https://github.com/purrplingcat/PurrplingMod/wiki/Content-packs) on wiki)
-- [NEW] User configuration (via `config.json`, see [SMAPI docs] (https://stardewvalleywiki.com/Modding:Player_Guide/Getting_Started#Configure_mods)) 
+- [NEW] User configuration (via `config.json`, see [SMAPI docs](https://stardewvalleywiki.com/Modding:Player_Guide/Getting_Started#Configure_mods)) 
 
 Next features comming soon...
 
@@ -60,8 +60,9 @@ You can add your custom NPC as companion to this mod via content pack. See [docu
 
 ## Translations
 
-- English ([smirkii](https://www.nexusmods.com/users/75542598), [purrplingcat](https://www.nexusmods.com/users/68185132))
+- English (corashirou, [smirkii](https://www.nexusmods.com/users/75542598), [purrplingcat](https://www.nexusmods.com/users/68185132))
 - Portuguese Brazilian ([andril11](https://www.nexusmods.com/users/68848663))
+- French ([Reikounet](https://www.nexusmods.com/users/70092158))
 
 ## Feature preview
 
@@ -94,8 +95,10 @@ More features comming soon...
 ## Contributors
 
 - [purrplingcat](https://www.nexusmods.com/users/68185132) - main developer and producer
+- Corashirou - author of dialogues and texts
 - [smirkii](https://www.nexusmods.com/users/75542598) - author of dialogues and texts
 - [andril11](https://www.nexusmods.com/users/68848663) - Portuguese translation
+- [Reikounet](https://www.nexusmods.com/users/70092158) - French translation
 
 [library]: docs/library.gif
 [ask2follow]: docs/asktofollow.gif
