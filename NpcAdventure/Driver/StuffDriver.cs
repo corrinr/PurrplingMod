@@ -40,34 +40,37 @@ namespace NpcAdventure.Driver
 
         public void PrepareDeliveredBagsToSave()
         {
-            FarmHouse house = Game1.getLocationFromName("FarmHouse") as FarmHouse;
-
             this.DumpedBags.Clear();
 
-            foreach (var objKv in house.objects.Pairs)
+            foreach (Farmer farmer in Game1.getAllFarmers())
             {
-                if (!(objKv.Value is Package bag))
-                    continue;
+                FarmHouse house = Game1.getLocationFromName(farmer.homeLocation) as FarmHouse;
 
-                Vector2 chestPosition = bag.TileLocation;
-                BagDumpInfo bagInfo = new BagDumpInfo()
+                foreach (var objKv in house.objects.Pairs)
                 {
-                    source = bag.GivenFrom,
-                    giftboxIndex = bag.giftboxIndex.Value,
-                    message = bag.Message,
-                    posX = (int)objKv.Key.X,
-                    posY = (int)objKv.Key.Y,
-                };
-                Chest chest = new Chest(true)
-                {
-                    TileLocation = bag.TileLocation
-                };
-                chest.items.AddRange(bag.items);
+                    if (!(objKv.Value is Package bag))
+                        continue;
 
-                house.objects[objKv.Key] = chest;
+                    Vector2 chestPosition = bag.TileLocation;
+                    BagDumpInfo bagInfo = new BagDumpInfo()
+                    {
+                        source = bag.GivenFrom,
+                        giftboxIndex = bag.giftboxIndex.Value,
+                        message = bag.Message,
+                        posX = (int)objKv.Key.X,
+                        posY = (int)objKv.Key.Y,
+                    };
+                    Chest chest = new Chest(true)
+                    {
+                        TileLocation = bag.TileLocation
+                    };
+                    chest.items.AddRange(bag.items);
 
-                this.DumpedBags.Add(bagInfo);
-                this.Monitor.Log($"Found bag to save from {bagInfo.source} at position {bagInfo.posX},{bagInfo.posY} with {chest.items.Count} items");
+                    house.objects[objKv.Key] = chest;
+
+                    this.DumpedBags.Add(bagInfo);
+                    this.Monitor.Log($"Found bag to save from {bagInfo.source} at position {bagInfo.posX},{bagInfo.posY} with {chest.items.Count} items");
+                }
             }
 
             this.Monitor.Log($"Detected {this.DumpedBags.Count} bags to save.");
@@ -78,29 +81,31 @@ namespace NpcAdventure.Driver
         public void ReviveDeliveredBags()
         {
             int reviveCount = 0;
-            FarmHouse house = Game1.getLocationFromName("FarmHouse") as FarmHouse;
-
-            foreach(BagDumpInfo bagInfo in this.DumpedBags)
+            foreach (Farmer farmer in Game1.getAllFarmers())
             {
-                Vector2 position = new Vector2(bagInfo.posX, bagInfo.posY);
-
-                if (!house.objects.TryGetValue(position, out StardewValley.Object obj) && !(obj is Chest))
+                FarmHouse house = Game1.getLocationFromName(farmer.homeLocation) as FarmHouse;
+                foreach (BagDumpInfo bagInfo in this.DumpedBags)
                 {
-                    this.Monitor.Log($"Bag at position ${position} can't be revived!", LogLevel.Warn);
-                    continue;
+                    Vector2 position = new Vector2(bagInfo.posX, bagInfo.posY);
+
+                    if (!house.objects.TryGetValue(position, out StardewValley.Object obj) && !(obj is Chest))
+                    {
+                        this.Monitor.Log($"Bag at position ${position} can't be revived!", LogLevel.Warn);
+                        continue;
+                    }
+
+                    Chest chest = obj as Chest;
+                    Package bag = new Package(chest.items.ToList(), position, 0)
+                    {
+                        GivenFrom = bagInfo.source,
+                        Message = bagInfo.message
+                    };
+
+                    house.objects[position] = bag;
+                    reviveCount++;
+
+                    this.Monitor.Log($"Revive dumpedBag on position ${bag.TileLocation} (Items count: {bag.items.Count})");
                 }
-
-                Chest chest = obj as Chest;
-                Package bag = new Package(chest.items.ToList(), position, 0)
-                {
-                    GivenFrom = bagInfo.source,
-                    Message = bagInfo.message
-                };
-
-                house.objects[position] = bag;
-                reviveCount++;
-
-                this.Monitor.Log($"Revive dumpedBag on position ${bag.TileLocation} (Items count: {bag.items.Count})");
             }
 
             this.Monitor.Log($"Revived {reviveCount} dumped bags!", LogLevel.Info);

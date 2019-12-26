@@ -4,8 +4,11 @@ using NpcAdventure.StateMachine.StateFeatures;
 using StardewModdingAPI;
 using StardewModdingAPI.Events;
 using StardewValley;
+using StardewValley.Objects;
 using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Text;
 using static NpcAdventure.StateMachine.CompanionStateMachine;
 
 namespace NpcAdventure.NetCode
@@ -29,7 +32,7 @@ namespace NpcAdventure.NetCode
             this.messages = new Dictionary<string, NetEventProcessor>()
             {
                 {DialogEvent.EVENTNAME, new NetEventShowDialogue(manager)},
-                {"companionRequest", new NetEventRecruitNPC(manager)},
+                {CompanionRequestEvent.EVENTNAME, new NetEventRecruitNPC(manager)},
                 {PlayerWarpedEvent.EVENTNAME, new NetEventPlayerWarped(manager)},
                 {DialogueRequestEvent.EVENTNAME, new NetEventDialogueRequest(manager)},
                 {QuestionEvent.EVENTNAME, new NetEventQuestionRequest(manager, this)},
@@ -37,6 +40,7 @@ namespace NpcAdventure.NetCode
                 {CompanionChangedState.EVENTNAME, new NetEventCompanionChangedState(manager)},
                 {CompanionStateRequest.EVENTNAME, new NetEventCompanionStateRequest(manager, this)},
                 {CompanionDismissEvent.EVENTNAME, new NetEventDismissNPC(manager)},
+                {SendChestEvent.EVENTNAME, new NetEventChestSent(manager)},
             };
         }
 
@@ -105,7 +109,7 @@ namespace NpcAdventure.NetCode
                 ICompanionState n = this.manager.PossibleCompanions[cde.otherNpc].currentState;
                 if (n is RecruitedState rs)
                 {
-                    rs.StateMachine.Dismiss(true, owner);
+                    rs.StateMachine.Dismiss(owner, true);
                 }
             }
 
@@ -240,6 +244,37 @@ namespace NpcAdventure.NetCode
                 foreach(var csmkv in this.manager.PossibleCompanions)
                 {
                     this.netBus.FireEvent(new CompanionChangedState(csmkv.Value.Companion, csmkv.Value.CurrentStateFlag, csmkv.Value.currentState.GetByWhom()), owner);
+                }
+            }
+        }
+
+        private class NetEventChestSent : NetEventProcessor
+        {
+            private CompanionManager manager;
+            public NetEventChestSent(CompanionManager manager)
+            {
+                this.manager = manager;
+            }
+
+            public override NpcSyncEvent Decode(ModMessageReceivedEventArgs e)
+            {
+                return e.ReadAs<SendChestEvent>();
+            }
+
+            public override void Process(NpcSyncEvent myEvent, Farmer owner)
+            {
+                SendChestEvent sce = myEvent as SendChestEvent;
+                MemoryStream stream = new MemoryStream();
+                byte[] data = Convert.FromBase64String(sce.chestContents);
+                stream.Write(data, 0, data.Length);
+                stream.Seek(0, SeekOrigin.Begin);
+                BinaryReader reader = new BinaryReader(stream);
+                this.manager.PossibleCompanions[sce.npc].Bag.NetFields.ReadFull(reader, new Netcode.NetVersion());
+                reader.Dispose();
+                NpcAdventureMod.GameMonitor.Log("Received bag of " + sce.npc + " with " + this.manager.PossibleCompanions[sce.npc].Bag.items.Count + " items");
+                foreach (Item item in this.manager.PossibleCompanions[sce.npc].Bag.items)
+                {
+                    NpcAdventureMod.GameMonitor.Log("Item " + item.Name + " #" + item.Stack);
                 }
             }
         }
@@ -499,24 +534,26 @@ namespace NpcAdventure.NetCode
             public CompanionStateRequest() : base(EVENTNAME) { }
 
         }
-        /*
-        public class CompanionResultEvent : DialogEvent
+
+        public class SendChestEvent : NpcSyncEvent
         {
-            public const string EVENTNAME = "companionResult";
-            public CompanionResultEvent()
+            public const string EVENTNAME = "sendChestEvent";
+            public string npc;
+            public string chestContents;
+
+            public SendChestEvent() { }
+
+            public SendChestEvent(NPC n, Chest chest) : base(EVENTNAME)
             {
-
+                MemoryStream stream = new MemoryStream();
+                BinaryWriter writer = new BinaryWriter(stream);
+                chest.NetFields.WriteFull(writer);
+                writer.Dispose();
+                this.chestContents = Convert.ToBase64String(stream.ToArray());
+                
+                NpcAdventureMod.GameMonitor.Log("Trying to write " + chestContents);
+                this.npc = n.Name;
             }
-
-            public CompanionResultEvent(string result) : base(EVENTNAME,)
-            {
-
-            }
-
-            public override void OnReceive(CompanionManager manager)
-            {
-                throw new NotImplementedException();
-            }
-        }*/
+        }
     }
 }

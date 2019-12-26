@@ -113,8 +113,11 @@ namespace NpcAdventure
 
         private void GameLoop_DayEnding(object sender, DayEndingEventArgs e)
         {
-            this.companionManager.ResetStateMachines();
-            this.companionManager.DumpCompanionNonEmptyBags();
+            if (Context.IsMainPlayer)
+            {
+                this.companionManager.DumpCompanionNonEmptyBags();
+                this.companionManager.ResetStateMachines();
+            }
         }
 
         private void GameLoop_ReturnedToTitle(object sender, StardewModdingAPI.Events.ReturnedToTitleEventArgs e)

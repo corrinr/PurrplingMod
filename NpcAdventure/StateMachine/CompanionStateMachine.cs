@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Xna.Framework;
+using Netcode;
 using NpcAdventure.Loader;
 using NpcAdventure.Model;
 using NpcAdventure.Objects;
@@ -35,7 +36,8 @@ namespace NpcAdventure.StateMachine
         public CompanionMetaData Metadata { get; }
         public IContentLoader ContentLoader { get; private set; }
         private IMonitor Monitor { get; }
-        public Chest Bag { get; private set; }
+
+        public  Chest Bag { get; set; }
         public IReflectionHelper Reflection { get; }
         public Dictionary<StateFlag, ICompanionState> States { get; private set; }
         public ICompanionState currentState { get; private set; }
@@ -72,6 +74,9 @@ namespace NpcAdventure.StateMachine
         /// <param name="stateFlag">Flag of allowed state</param>
         private void ChangeState(StateFlag stateFlag, Farmer byWhom)
         {
+            if (!Context.IsMainPlayer && this.CurrentStateFlag == StateFlag.RECRUITED && stateFlag != StateFlag.RECRUITED) // sync bag status to server when we're leaving recruited state
+                this.CompanionManager.netEvents.FireEvent(new SendChestEvent(this.Companion, this.Bag));
+
             if (this.States == null)
                 throw new InvalidStateException("State machine is not ready! Call setup first.");
 
@@ -102,7 +107,7 @@ namespace NpcAdventure.StateMachine
                 throw new InvalidOperationException("State machine is already set up!");
 
             this.States = stateHandlers;
-            this.ResetStateMachine();
+            this.ResetStateMachine(null);
         }
 
         /// <summary>
@@ -136,7 +141,7 @@ namespace NpcAdventure.StateMachine
             if (Utility.isFestivalDay(Game1.dayOfMonth, Game1.currentSeason))
             {
                 this.Monitor.Log($"{this.Name} is unavailable to recruit due to festival today.");
-                this.MakeUnavailable();
+                this.MakeUnavailable(null);
                 return;
             }
 
@@ -148,7 +153,7 @@ namespace NpcAdventure.StateMachine
                 DialogueHelper.SetupCompanionDialogues(this.Companion, this.ContentLoader.LoadStrings($"Dialogue/{this.Name}Spouse"));
 
             this.RecruitedToday = false;
-            this.MakeAvailable();
+            this.MakeAvailable(null);
         }
 
         /// <summary>
@@ -156,18 +161,17 @@ namespace NpcAdventure.StateMachine
         /// </summary>
         public void DumpBagInFarmHouse()
         {
-            FarmHouse farm = (FarmHouse)Game1.getLocationFromName("FarmHouse");
-            Vector2 place = Utility.PointToVector2(farm.getRandomOpenPointInHouse(Game1.random));
+            FarmHouse house = Game1.getLocationFromName(this.currentState.GetByWhom().homeLocation) as FarmHouse;
+            
+            Vector2 place = Utility.PointToVector2(house.getRandomOpenPointInHouse(Game1.random));
             Package dumpedBag = new Package(this.Bag.items.ToList(), place)
             {
                 GivenFrom = this.Name,
                 Message = this.ContentLoader.LoadString("Strings/Strings:bagItemsSentLetter", this.CompanionManager.Farmer.Name, this.Companion.displayName)
             };
-
-            farm.objects.Add(place, dumpedBag);
-            this.Bag = new Chest(true);
-
+            house.objects.Add(place, dumpedBag);
             this.Monitor.Log($"{this.Companion} delivered bag contents into farm house at position {place}");
+            
         }
 
         /// <summary>
@@ -215,12 +219,12 @@ namespace NpcAdventure.StateMachine
         /// <summary>
         /// Make companion AVAILABLE to recruit
         /// </summary>
-        public void MakeAvailable(Farmer byWhom = null)
+        public void MakeAvailable(Farmer byWhom)
         {
             this.CompanionManager.netEvents.FireEvent(new CompanionChangedState(this.Companion, StateFlag.AVAILABLE, byWhom), null, true);
         }
 
-        public void MakeLocalAvailable(Farmer byWhom = null)
+        public void MakeLocalAvailable(Farmer byWhom)
         {
             this.ChangeState(StateFlag.AVAILABLE, byWhom);
         }
@@ -228,26 +232,43 @@ namespace NpcAdventure.StateMachine
         /// <summary>
         /// Make companion UNAVAILABLE to recruit
         /// </summary>
-        public void MakeUnavailable(Farmer byWhom = null)
+        public void MakeUnavailable(Farmer byWhom)
         {
             this.CompanionManager.netEvents.FireEvent(new CompanionChangedState(this.Companion, StateFlag.UNAVAILABLE, byWhom), null, true);
         }
 
-        public void MakeLocalUnavailable(Farmer byWhom = null)
+        public void MakeLocalUnavailable(Farmer byWhom)
         {
+            if (byWhom != null)
+            {
+                NpcAdventureMod.GameMonitor.Log("Setting unavailable by " + byWhom.Name);
+            } else
+            {
+                NpcAdventureMod.GameMonitor.Log("Setting unavailable by NOBODY");
+            }
+            
             this.ChangeState(StateFlag.UNAVAILABLE, byWhom);
+            if (this.currentState.GetByWhom() != null)
+            {
+                NpcAdventureMod.GameMonitor.Log("New state " + this.CurrentStateFlag.ToString() + " by " + this.currentState.GetByWhom().Name);
+            }
+            else
+            {
+                NpcAdventureMod.GameMonitor.Log("Set unavailable by NOBODY");
+            }
+            
         }
 
         /// <summary>
         /// Reset companion's state machine
         /// </summary>
-        public void ResetStateMachine(Farmer byWhom = null)
+        public void ResetStateMachine(Farmer byWhom)
         {
             if (Game1.IsMasterGame)
               this.CompanionManager.netEvents.FireEvent(new CompanionChangedState(this.Companion, StateFlag.RESET, byWhom), null, true);
         }
 
-        public void ResetLocalStateMachine(Farmer byWhom = null)
+        public void ResetLocalStateMachine(Farmer byWhom)
         {
             this.ChangeState(StateFlag.RESET, byWhom);
         }
@@ -256,7 +277,7 @@ namespace NpcAdventure.StateMachine
         /// Dismiss recruited companion
         /// </summary>
         /// <param name="keepUnavailableOthers">Keep other companions unavailable?</param>
-        internal void Dismiss(bool keepUnavailableOthers = false, Farmer byWhom = null)
+        internal void Dismiss(Farmer byWhom, bool keepUnavailableOthers = false)
         {
             this.ResetStateMachine(byWhom);
 
@@ -265,8 +286,8 @@ namespace NpcAdventure.StateMachine
 
             this.BackedupSchedule = null;
             //this.ChangeState(StateFlag.UNAVAILABLE, byWhom);
-            this.MakeUnavailable(byWhom); // TODO make sure that somebody else when asked gets the message that the NPC has already been claimed today
-            this.CompanionManager.CompanionDissmised(keepUnavailableOthers);
+            this.MakeUnavailable(byWhom);
+            this.CompanionManager.CompanionDissmised(byWhom, keepUnavailableOthers);
         }
 
         /// <summary>

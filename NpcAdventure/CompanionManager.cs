@@ -124,7 +124,7 @@ namespace NpcAdventure
         public void ResetStateMachines()
         {
             foreach (var companionKv in this.PossibleCompanions)
-                companionKv.Value.ResetStateMachine();
+                companionKv.Value.ResetStateMachine(null);
         }
 
         /// <summary>
@@ -160,15 +160,15 @@ namespace NpcAdventure
         /// When any companion dissmised (relieved from duty, unfollow player)
         /// </summary>
         /// <param name="keepUnavailable">Set this companion unavailable after dismiss?</param>
-        internal void CompanionDissmised(bool keepUnavailable = false)
+        internal void CompanionDissmised(Farmer byWhom, bool keepUnavailable = false)
         {
-            foreach (var csmKv in this.PossibleCompanions)
+            /*foreach (var csmKv in this.PossibleCompanions)
             {
                 if (keepUnavailable)
-                    csmKv.Value.MakeUnavailable();
+                    csmKv.Value.MakeUnavailable(byWhom);
                 else if (!csmKv.Value.RecruitedToday)
-                    csmKv.Value.MakeAvailable();
-            }
+                    csmKv.Value.MakeAvailable(byWhom);
+            }*/
         }
 
         /// <summary>

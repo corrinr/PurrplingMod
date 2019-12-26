@@ -124,7 +124,7 @@ namespace NpcAdventure.StateMachine.State
         {
             if (this.StateMachine.CompanionManager.PossibleCompanions[n.Name].CurrentStateFlag != CompanionStateMachine.StateFlag.AVAILABLE) // make sure they're not taken
             {
-                this.StateMachine.CompanionManager.netEvents.FireEvent(new DialogEvent("companionTaken", n));
+                this.StateMachine.CompanionManager.netEvents.FireEvent(new DialogEvent("companionTaken", n), byWhom);
                 return;
             }
 
@@ -132,12 +132,12 @@ namespace NpcAdventure.StateMachine.State
             {
                 if (csmKv.Value.currentState.GetByWhom() != null && byWhom.uniqueMultiplayerID == csmKv.Value.currentState.GetByWhom().uniqueMultiplayerID && csmKv.Value.CurrentStateFlag == CompanionStateMachine.StateFlag.RECRUITED) // if the person is already taken by us
                 {
-                    this.StateMachine.CompanionManager.netEvents.FireEvent(new DialogEvent("companionYoureNotFree", n));
+                    this.StateMachine.CompanionManager.netEvents.FireEvent(new DialogEvent("companionYoureNotFree", n), byWhom);
                     return;
                 } 
                 else if (csmKv.Value.currentState.GetByWhom() != null && byWhom.uniqueMultiplayerID == csmKv.Value.currentState.GetByWhom().uniqueMultiplayerID && csmKv.Value.CurrentStateFlag == CompanionStateMachine.StateFlag.RECRUITED) // TODO remove when we get rclick event syncing
                 {
-                    this.StateMachine.CompanionManager.netEvents.FireEvent(new DialogEvent("recruitedWant", n));
+                    this.StateMachine.CompanionManager.netEvents.FireEvent(new DialogEvent("recruitedWant", n), byWhom);
                     return;
                 }
             }
