@@ -65,6 +65,7 @@ namespace NpcAdventure
 
         private void GameLoop_GameLaunched(object sender, GameLaunchedEventArgs e)
         {
+            this.SpecialEvents = new SpecialModEvents();
             this.DialogueDriver = new DialogueDriver(this.Helper.Events);
             this.HintDriver = new HintDriver(this.Helper.Events);
             this.StuffDriver = new StuffDriver(this.Helper.Data, this.Monitor);
@@ -74,6 +75,15 @@ namespace NpcAdventure
             this.netEvents.RegisterCompanionManager(this.companionManager);
 
             this.netEvents.SetUp(this.companionManager);
+            
+            //Harmony
+            HarmonyInstance harmony = HarmonyInstance.Create("Purrplingcat.NpcAdventure");
+            harmony.Patch(
+                original: AccessTools.Method(typeof(GameLocation), "draw"),
+                postfix: new HarmonyMethod(typeof(Patches.GameLocationDrawPatch), nameof(Patches.GameLocationDrawPatch.Postfix))
+            );
+
+            Patches.GameLocationDrawPatch.Setup(this.SpecialEvents);
         }
 
         private void Specialized_LoadStageChanged(object sender, LoadStageChangedEventArgs e)
@@ -108,6 +118,8 @@ namespace NpcAdventure
 
         private void GameLoop_DayStarted(object sender, DayStartedEventArgs e)
         {
+            if (Context.IsMultiplayer)
+                return;
             this.companionManager.NewDaySetup();
         }
 
@@ -122,6 +134,8 @@ namespace NpcAdventure
 
         private void GameLoop_ReturnedToTitle(object sender, StardewModdingAPI.Events.ReturnedToTitleEventArgs e)
         {
+            if (Context.IsMultiplayer)
+                return;
             this.companionManager.UninitializeCompanions();
             this.contentLoader.InvalidateCache();
         }

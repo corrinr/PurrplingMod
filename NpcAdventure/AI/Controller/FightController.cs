@@ -168,12 +168,7 @@ namespace NpcAdventure.AI.Controller
 
             // Only live mummy is valid
             if (monster is Mummy mummy)
-            {
-                FieldInfo reviveTimer =
-                    typeof(Mummy).GetField("reviveTimer", BindingFlags.NonPublic | BindingFlags.Instance);
-                int t = (int)reviveTimer.GetValue(mummy);
-                return t <= 0;
-            }
+                return mummy.reviveTimer.Value <= 0;
 
             // All other monsters all valid
             return true;
@@ -253,6 +248,11 @@ namespace NpcAdventure.AI.Controller
             {
                 this.weaponSwingCooldown--;
             }
+
+            if (this.weaponSwingCooldown > this.SwingThreshold && !this.defendFistUsed)
+            {
+                this.DoDamage();
+            }
         }
 
         public override void Update(UpdateTickedEventArgs e)
@@ -275,6 +275,9 @@ namespace NpcAdventure.AI.Controller
         /// </summary>
         private void DoDamage(bool criticalFist = false)
         {
+            if (this.leader == null)
+                return;
+
             Rectangle effectiveArea = this.follower.GetBoundingBox();
             Rectangle enemyBox = this.leader.GetBoundingBox();
             Rectangle companionBox = this.follower.GetBoundingBox();
@@ -302,8 +305,7 @@ namespace NpcAdventure.AI.Controller
 
             if (criticalFist && this.follower.FacingDirection != 0)
             {
-                this.follower.currentLocation.playSound("clubSmash");
-                this.follower.currentLocation.temporarySprites.Add(new TemporaryAnimatedSprite("TileSheets\\animations", new Microsoft.Xna.Framework.Rectangle(0, 960, 128, 128), 60f, 4, 0, this.follower.Position, false, this.follower.FacingDirection == 3, 1f, 0.0f, Color.White, .5f, 0.0f, 0.0f, 0.0f, false));
+                this.follower.currentLocation.temporarySprites.Add(new TemporaryAnimatedSprite("TileSheets\\animations", new Rectangle(0, 960, 128, 128), 60f, 4, 0, this.follower.Position, false, this.follower.FacingDirection == 3, 1f, 0.0f, Color.White, .5f, 0.0f, 0.0f, 0.0f, false));
             }
 
             companionBox.Inflate(4, 4); // Personal space
@@ -319,9 +321,19 @@ namespace NpcAdventure.AI.Controller
 
             if (this.follower.currentLocation.damageMonster(effectiveArea, attrs.minDamage, attrs.maxDamage, false, attrs.knockBack, attrs.addedPrecision, attrs.critChance, attrs.critMultiplier, !criticalFist, this.realLeader as Farmer))
             {
-                this.follower.currentLocation.playSound("clubhit");
+                if (criticalFist)
+                {
+                    this.follower.currentLocation.playSound("clubSmash");
+                }
+                else
+                {
+                    this.follower.currentLocation.playSound("clubhit");
+                }
+
                 if (criticalFist || (Game1.random.NextDouble() > .7f && Game1.random.NextDouble() < .3f))
+                {
                     this.DoFightSpeak();
+                }
             }
         }
 
