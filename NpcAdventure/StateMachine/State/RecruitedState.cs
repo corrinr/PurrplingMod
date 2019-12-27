@@ -62,8 +62,6 @@ namespace NpcAdventure.StateMachine.State
                 Patches.SpouseReturnHomePatch.recruitedSpouses.Add(this.StateMachine.Companion.Name);
             }
 
-            this.Events.GameLoop.UpdateTicked += this.GameLoop_UpdateTicked;
-            this.Events.GameLoop.TimeChanged += this.GameLoop_TimeChanged;
             this.Events.Player.Warped += this.Player_Warped;
             this.SpecialEvents.RenderedLocation += this.SpecialEvents_RenderedLocation;
 

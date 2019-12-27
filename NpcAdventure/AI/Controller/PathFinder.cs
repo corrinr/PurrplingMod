@@ -9,6 +9,8 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using xTile.Dimensions;
+using xTile.ObjectModel;
+using xTile.Tiles;
 
 namespace NpcAdventure.AI.Controller
 {
@@ -257,6 +259,16 @@ namespace NpcAdventure.AI.Controller
                         return true;
                 }
             }
+            Tile tile = this.GameLocation.Map.GetLayer("Buildings").Tiles[(int)tileLocation.X, (int)tileLocation.Y];
+
+            //NpcAdventureMod.GameMonitor.Log("Tile: " + tileLocation.X + " .. " + tileLocation.Y + " ... " + (tile == null ? "null" : tile.Id));
+            if (tile != null && tile.TileIndexProperties.TryGetValue("Action", out PropertyValue propertyValue))
+            {
+                string strPropertyValue = propertyValue.ToString();
+                if (strPropertyValue.Contains("Door") || strPropertyValue.Contains("Passable"))
+                    return true;
+            }
+
             return false;
         }
 

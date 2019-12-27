@@ -51,6 +51,8 @@ namespace NpcAdventure.AI.Controller
         private Vector2 animationUpdateSum;
         private int idleTImer;
 
+        private int retryCount;
+
         public virtual bool IsIdle => this.idleTImer == 0;
 
         internal FollowController(AI_StateMachine ai)
@@ -69,6 +71,7 @@ namespace NpcAdventure.AI.Controller
             this.ai.LocationChanged += this.Ai_LocationChanged;
 
             this.gatesInThisLocation = this.CheckForGatesInThisLocation();
+            this.retryCount = 0;
         }
 
         private void Ai_LocationChanged(object sender, EventArgsLocationChanged e)
@@ -82,6 +85,7 @@ namespace NpcAdventure.AI.Controller
             this.leaderLastTileCheckPoint = this.negativeOne;
             this.gatesInThisLocation = this.CheckForGatesInThisLocation();
             this.PathfindingRemakeCheck();
+            this.retryCount = 0;
         }
 
         public virtual void Update(UpdateTickedEventArgs e)
@@ -204,7 +208,13 @@ namespace NpcAdventure.AI.Controller
                 if (this.pathToFollow != null && this.pathToFollow.Count > 0 && this.follower.getTileLocation() != this.pathToFollow.Peek())
                     this.currentFollowedPoint = this.pathToFollow.Dequeue();
                 else
-                    this.currentFollowedPoint = this.negativeOne;
+                {
+                    if (this.leader is Farmer && ++this.retryCount >= 3)
+                    {
+                        this.follower.setTileLocation(this.leader.getTileLocation());
+                        this.retryCount = 0;
+                    }
+                }
             }
 
             this.leaderLastTileCheckPoint = leaderCurrentTile;
