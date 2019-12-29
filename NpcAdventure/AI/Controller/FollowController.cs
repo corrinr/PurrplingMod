@@ -94,6 +94,10 @@ namespace NpcAdventure.AI.Controller
                 return;
 
             this.CheckIdleState();
+
+            if (!Context.IsMainPlayer)
+                return; // do not do further processing
+
             this.PathfindingNodeUpdateCheck();
 
             if (this.currentFollowedPoint != this.negativeOne)
@@ -446,7 +450,7 @@ namespace NpcAdventure.AI.Controller
 
         public virtual void Activate()
         {
-            if (this.leader != null)
+            if (this.leader != null && Context.IsMainPlayer)
             {
                 this.PathfindingRemakeCheck();
             }

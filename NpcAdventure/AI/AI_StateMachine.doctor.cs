@@ -5,6 +5,7 @@ using StardewValley;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using static NpcAdventure.NetCode.NetEvents;
 
 namespace NpcAdventure.AI
 {
@@ -29,8 +30,9 @@ namespace NpcAdventure.AI
                 if (this.player.health > this.player.maxHealth)
                     this.player.health = this.player.maxHealth;
 
-                Game1.drawDialogue(this.npc, DialogueHelper.GetDialogueString(this.npc, "heal"));
-                Game1.addHUDMessage(new HUDMessage(this.Csm.ContentLoader.LoadString("Strings/Strings:healed", this.npc.displayName, health), HUDMessage.health_type));
+                this.netEvents.FireEvent(new DialogEvent("heal", this.npc), this.player);
+
+                this.netEvents.FireEvent(new ShowHUDMessageHealed(this.npc, health), this.player);
                 this.Monitor.Log($"{this.npc.Name} healed you! Remaining medkits: {this.medkits}", LogLevel.Info);
                 return true;
             }
@@ -38,7 +40,7 @@ namespace NpcAdventure.AI
             if (this.medkits == 0)
             {
                 this.Monitor.Log($"No medkits. {this.npc.Name} can't heal you!", LogLevel.Info);
-                Game1.drawDialogue(this.npc, DialogueHelper.GetDialogueString(this.npc, "nomedkits"));
+                this.netEvents.FireEvent(new DialogEvent("nomedkits", this.npc));
                 this.medkits = -1;
             }
 
@@ -77,7 +79,7 @@ namespace NpcAdventure.AI
         public void UpdateDoctor(UpdateTickedEventArgs e)
         {
             // Countdown to companion can heal you if heal cooldown greather than zero
-            if (this.healCooldown > 0 && Context.IsPlayerFree)
+            if (this.healCooldown > 0 && Context.IsPlayerFree && Context.IsMainPlayer)
             {
                 // Every 3 seconds while countdown add 1% of maxhealth to player's health (Companion heal side-effect) 
                 // Take effect when cooldown half way though and player's health is lower than 60% of maxhealth
@@ -89,7 +91,7 @@ namespace NpcAdventure.AI
             }
 
             // Doctor companion try to save your life if you have less than 5% of health and your life not saved in last time
-            if (e.IsOneSecond && this.medkits > 0 && this.player.health < this.player.maxHealth * 0.05 && !this.lifeSaved)
+            if (e.IsOneSecond && this.medkits > 0 && this.player.health < this.player.maxHealth * 0.05 && !this.lifeSaved && Context.IsMainPlayer)
                 this.TrySaveLife();
         }
     }

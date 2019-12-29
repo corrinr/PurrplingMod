@@ -16,33 +16,33 @@ using NpcAdventure.AI;
 using Microsoft.Xna.Framework.Graphics;
 using NpcAdventure.Events;
 using static NpcAdventure.NetCode.NetEvents;
+using NpcAdventure.NetCode;
 
 namespace NpcAdventure.StateMachine.State
 {
     internal class RecruitedState : CompanionState, IRequestedDialogueCreator, IDialogueDetector
     {
-        private AI_StateMachine ai;
+        public AI_StateMachine ai;
         private Dialogue dismissalDialogue;
         private Dialogue currentLocationDialogue;
 
         public bool CanCreateDialogue { get; private set; }
         private BuffManager BuffManager { get; set; }
+        private NetEvents netEvents;
         public ISpecialModEvents SpecialEvents { get; }
 
-        public RecruitedState(CompanionStateMachine stateMachine, IModEvents events, ISpecialModEvents specialEvents, IMonitor monitor) : base(stateMachine, events, monitor)
+        public RecruitedState(CompanionStateMachine stateMachine, IModEvents events, ISpecialModEvents specialEvents, IMonitor monitor, NetEvents netEvents) : base(stateMachine, events, monitor)
         {
             this.BuffManager = new BuffManager(stateMachine.Companion, stateMachine.CompanionManager.Farmer, stateMachine.ContentLoader);
             this.SpecialEvents = specialEvents;
+            this.netEvents = netEvents;
         }
 
         public override void Entry(Farmer byWhom)
         {
             this.setByWhom = byWhom;
-            
-            if (Game1.IsMasterGame)
-            {
-                this.ai = new AI_StateMachine(this.StateMachine, this.setByWhom, this.StateMachine.CompanionManager.Hud, this.Events, this.monitor);
-            }
+
+            this.ai = new AI_StateMachine(this.StateMachine, this.setByWhom, this.StateMachine.CompanionManager.Hud, this.Events, this.monitor, this.netEvents);
 
             if (this.StateMachine.Companion.doingEndOfRouteAnimation.Value)
                 this.FinishScheduleAnimation();
@@ -65,9 +65,11 @@ namespace NpcAdventure.StateMachine.State
             this.Events.Player.Warped += this.Player_Warped;
             this.SpecialEvents.RenderedLocation += this.SpecialEvents_RenderedLocation;
 
+            this.Events.GameLoop.UpdateTicked += this.GameLoop_UpdateTicked;
+
             if (Game1.IsMasterGame)
             {
-                this.Events.GameLoop.UpdateTicked += this.GameLoop_UpdateTicked;
+                
                 this.Events.GameLoop.TimeChanged += this.GameLoop_TimeChanged;
             }
 
@@ -80,19 +82,22 @@ namespace NpcAdventure.StateMachine.State
                 this.StateMachine.Companion.setNewDialogue(dialogueText);
             this.CanCreateDialogue = true;
 
-            if (Game1.IsMasterGame)
+            this.ai.Setup();
+
+            if (byWhom == Game1.player)
             {
-                this.ai.Setup();
-            }
-            foreach (string skill in this.StateMachine.Metadata.PersonalSkills)
-            {
-                string text = this.StateMachine.ContentLoader.LoadString($"Strings/Strings:skill.{skill}", this.StateMachine.Companion.displayName)
-                        + Environment.NewLine
-                        + this.StateMachine.ContentLoader.LoadString($"Strings/Strings:skillDescription.{skill}");
-                this.StateMachine.CompanionManager.Hud.AddSkill(skill, text);
+                foreach (string skill in this.StateMachine.Metadata.PersonalSkills)
+                {
+                    string text = this.StateMachine.ContentLoader.LoadString($"Strings/Strings:skill.{skill}", this.StateMachine.Companion.displayName)
+                            + Environment.NewLine
+                            + this.StateMachine.ContentLoader.LoadString($"Strings/Strings:skillDescription.{skill}");
+
+                    this.StateMachine.CompanionManager.Hud.AddSkill(skill, text);
+                }
+                this.StateMachine.CompanionManager.Hud.AssignCompanion(this.StateMachine.Companion);
             }
 
-            this.StateMachine.CompanionManager.Hud.AssignCompanion(this.StateMachine.Companion);
+            
         }
 
         private void SpecialEvents_RenderedLocation(object sender, ILocationRenderedEventArgs e)
@@ -143,7 +148,8 @@ namespace NpcAdventure.StateMachine.State
 
             this.ai = null;
             this.dismissalDialogue = null;
-            this.StateMachine.CompanionManager.Hud.Reset();
+            if (this.GetByWhom() == Game1.player)
+                this.StateMachine.CompanionManager.Hud.Reset();
         }
 
         private void GameLoop_TimeChanged(object sender, TimeChangedEventArgs e)

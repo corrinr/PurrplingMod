@@ -1,6 +1,8 @@
-﻿using NpcAdventure.StateMachine;
+﻿using NpcAdventure.Loader;
+using NpcAdventure.StateMachine;
 using NpcAdventure.StateMachine.State;
 using NpcAdventure.StateMachine.StateFeatures;
+using NpcAdventure.Utils;
 using StardewModdingAPI;
 using StardewModdingAPI.Events;
 using StardewValley;
@@ -9,6 +11,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
+using static NpcAdventure.AI.AI_StateMachine;
 using static NpcAdventure.StateMachine.CompanionStateMachine;
 
 namespace NpcAdventure.NetCode
@@ -26,10 +29,10 @@ namespace NpcAdventure.NetCode
         public NetEvents(IMultiplayerHelper helper)
         {
             this.helper = helper;
-            
+
         }
 
-        public void SetUp(IManifest manifest, CompanionManager manager)
+        public void SetUp(IManifest manifest, CompanionManager manager, ContentLoader loader)
         {
             this.companionManager = manager;
             this.modManifest = manifest;
@@ -46,6 +49,8 @@ namespace NpcAdventure.NetCode
                 {CompanionStateRequest.EVENTNAME, new NetEventCompanionStateRequest(manager, this)},
                 {CompanionDismissEvent.EVENTNAME, new NetEventDismissNPC(manager)},
                 {SendChestEvent.EVENTNAME, new NetEventChestSent(manager)},
+                {AIChangeState.EVENTNAME, new NetEventAIChangeState(manager)},
+                {ShowHUDMessageHealed.EVENTNAME, new NetEventHUDMessageHealed(manager, loader)},
             };
         }
 
@@ -65,7 +70,7 @@ namespace NpcAdventure.NetCode
             public override void Process(NpcSyncEvent npcEvent, Farmer owner)
             {
                 DialogEvent dialogEvent = (DialogEvent)npcEvent;
-                this.manager.PossibleCompanions[dialogEvent.otherNpc].currentState.ShowDialogue(dialogEvent.Dialog);
+                this.manager.PossibleCompanions[dialogEvent.otherNpc].currentState.ShowDialogue(DialogueHelper.GetDialogueString(this.manager.PossibleCompanions[dialogEvent.otherNpc].Companion, dialogEvent.Dialog));
             }
 
             public override NpcSyncEvent Decode(ModMessageReceivedEventArgs e)
@@ -141,8 +146,8 @@ namespace NpcAdventure.NetCode
             {
                 PlayerWarpedEvent pwe = (PlayerWarpedEvent)myEvent;
                 ICompanionState n = this.manager.PossibleCompanions[pwe.npc].currentState;
-                if(n is RecruitedState recruitedState && n.GetByWhom().uniqueMultiplayerID == owner.uniqueMultiplayerID)
-                { 
+                if (n is RecruitedState recruitedState && n.GetByWhom().uniqueMultiplayerID == owner.uniqueMultiplayerID)
+                {
                     NpcAdventureMod.GameMonitor.Log("Dispatching player warped to a recruited state...");
 
                     GameLocation from = Game1.getLocationFromName(pwe.warpedFrom);
@@ -246,10 +251,56 @@ namespace NpcAdventure.NetCode
 
             public override void Process(NpcSyncEvent myEvent, Farmer owner)
             {
-                foreach(var csmkv in this.manager.PossibleCompanions)
+                foreach (var csmkv in this.manager.PossibleCompanions)
                 {
                     this.netBus.FireEvent(new CompanionChangedState(csmkv.Value.Companion, csmkv.Value.CurrentStateFlag, csmkv.Value.currentState.GetByWhom()), owner);
                 }
+            }
+        }
+
+        private class NetEventAIChangeState : NetEventProcessor
+        {
+            private CompanionManager manager;
+
+            public NetEventAIChangeState(CompanionManager manager)
+            {
+                this.manager = manager;
+            }
+
+            public override NpcSyncEvent Decode(ModMessageReceivedEventArgs e)
+            {
+                return e.ReadAs<AIChangeState>();
+            }
+
+            public override void Process(NpcSyncEvent myEvent, Farmer owner)
+            {
+                AIChangeState aics = (AIChangeState)myEvent;
+                RecruitedState state = this.manager.PossibleCompanions[aics.npc].currentState as RecruitedState;
+                if (state != null)
+                {
+                    state.ai.ChangeStateLocal(aics.newState);
+                }
+            }
+        }
+
+        private class NetEventHUDMessageHealed : NetEventProcessor
+        {
+            private CompanionManager manager;
+            private ContentLoader loader;
+            public NetEventHUDMessageHealed(CompanionManager manager, ContentLoader loader)
+            {
+                this.manager = manager;
+                this.loader = loader;
+            }
+
+            public override NpcSyncEvent Decode(ModMessageReceivedEventArgs e)
+            {
+                return e.ReadAs<ShowHUDMessageHealed>();
+            }
+            public override void Process(NpcSyncEvent myEvent, Farmer owner)
+            {
+                ShowHUDMessageHealed message = myEvent as ShowHUDMessageHealed;
+                Game1.addHUDMessage(new HUDMessage(this.loader.LoadString($"Strings/Strings:{message.message}", this.manager.PossibleCompanions[message.npc].Companion.displayName, message.health)));
             }
         }
 
@@ -302,7 +353,7 @@ namespace NpcAdventure.NetCode
             {
                 CompanionChangedState ccs = (CompanionChangedState)myEvent;
                 CompanionStateMachine n = manager.PossibleCompanions[ccs.npc];
-                switch(ccs.NewState)
+                switch (ccs.NewState)
                 {
                     case StateFlag.AVAILABLE:
                         n.MakeLocalAvailable(ccs.GetByWhom());
@@ -332,7 +383,7 @@ namespace NpcAdventure.NetCode
 
         private void OnLoadStageChanged(object sender, LoadStageChangedEventArgs e)
         {
-            if(Context.IsMultiplayer && e.NewStage == StardewModdingAPI.Enums.LoadStage.Ready && !Game1.IsMasterGame)
+            if (Context.IsMultiplayer && e.NewStage == StardewModdingAPI.Enums.LoadStage.Ready && !Game1.IsMasterGame)
             {
                 this.FireEvent(new CompanionStateRequest());
             }
@@ -360,7 +411,7 @@ namespace NpcAdventure.NetCode
             if (Context.IsMultiplayer && toWhom != Game1.player)
             {
                 NpcAdventureMod.GameMonitor.Log("Sending message " + myEvent.Name + " to network", LogLevel.Info);
-                helper.SendMessage<NpcSyncEvent>(myEvent, myEvent.Name, new string[] {this.modManifest.UniqueID}, new long[] { toWhom.uniqueMultiplayerID });
+                helper.SendMessage<NpcSyncEvent>(myEvent, myEvent.Name, new string[] { this.modManifest.UniqueID }, new long[] { toWhom.uniqueMultiplayerID });
             }
             else
             {
@@ -523,7 +574,7 @@ namespace NpcAdventure.NetCode
                 this.npc = n.Name;
                 this.NewState = NewState;
                 if (byWhom != null)
-                  this.byWhom = byWhom.uniqueMultiplayerID;
+                    this.byWhom = byWhom.uniqueMultiplayerID;
             }
         }
 
@@ -550,9 +601,63 @@ namespace NpcAdventure.NetCode
                 chest.NetFields.WriteFull(writer);
                 writer.Dispose();
                 this.chestContents = Convert.ToBase64String(stream.ToArray());
-                
+
                 NpcAdventureMod.GameMonitor.Log("Trying to write " + chestContents);
                 this.npc = n.Name;
+            }
+        }
+
+        public class AIChangeState : NpcSyncEvent
+        {
+            public const string EVENTNAME = "aiChangeState";
+
+            public string npc;
+            public State newState;
+
+            public AIChangeState() { }
+
+            public AIChangeState(NPC n, State newState) : base(EVENTNAME)
+            {
+                this.npc = n.Name;
+                this.newState = newState;
+            }
+        }
+
+        public abstract class ShowHUDMessage : NpcSyncEvent
+        { 
+            public string npc;
+            public string message;
+            public int type;
+
+            public ShowHUDMessage() { }
+
+            public ShowHUDMessage(string eventname, NPC n, string message, int type) : base(eventname)
+            {
+                this.npc = n.Name;
+                this.message = message;
+                this.type = type;
+            }
+
+            public abstract object[] gatherArgs();
+
+        }
+
+        public class ShowHUDMessageHealed : ShowHUDMessage
+        {
+            public const string EVENTNAME = "showHudMessageHealed";
+
+            public int health;
+
+            public ShowHUDMessageHealed() { }
+
+            public ShowHUDMessageHealed(NPC n, int health) : base(EVENTNAME, n, "healed", HUDMessage.health_type)
+            {
+                this.health = health;
+            }
+
+            public override object[] gatherArgs()
+            {
+                return new object[] { this.npc, this.health };
             }
         }
     }

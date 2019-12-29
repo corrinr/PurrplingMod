@@ -196,7 +196,7 @@ namespace NpcAdventure
                 {
                     [StateFlag.RESET] = new ResetState(csm, gameEvents, this.monitor),
                     [StateFlag.AVAILABLE] = new AvailableState(csm, gameEvents, this.monitor),
-                    [StateFlag.RECRUITED] = new RecruitedState(csm, gameEvents, specialEvents, this.monitor),
+                    [StateFlag.RECRUITED] = new RecruitedState(csm, gameEvents, specialEvents, this.monitor, this.netEvents),
                     [StateFlag.UNAVAILABLE] = new UnavailableState(csm, gameEvents, this.monitor),
                 };
 

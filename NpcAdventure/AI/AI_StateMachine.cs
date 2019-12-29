@@ -3,6 +3,7 @@ using NpcAdventure.AI.Controller;
 using NpcAdventure.HUD;
 using NpcAdventure.Loader;
 using NpcAdventure.Model;
+using NpcAdventure.NetCode;
 using NpcAdventure.StateMachine;
 using NpcAdventure.Utils;
 using StardewModdingAPI;
@@ -14,6 +15,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using static NpcAdventure.NetCode.NetEvents;
 
 namespace NpcAdventure.AI
 {
@@ -36,11 +38,13 @@ namespace NpcAdventure.AI
         private readonly IModEvents events;
         internal IMonitor Monitor { get; private set; }
 
+        private NetEvents netEvents;
+
         private readonly IContentLoader loader;
         private Dictionary<State, IController> controllers;
         private int changeStateCooldown = 0;
 
-        internal AI_StateMachine(CompanionStateMachine csm, Farmer leader, CompanionDisplay hud, IModEvents events, IMonitor monitor)
+        internal AI_StateMachine(CompanionStateMachine csm, Farmer leader, CompanionDisplay hud, IModEvents events, IMonitor monitor, NetEvents netEvents)
         {
             this.npc = csm.Companion;
             this.player = leader;
@@ -49,6 +53,8 @@ namespace NpcAdventure.AI
             this.Csm = csm;
             this.hud = hud;
             this.loader = csm.ContentLoader;
+
+            this.netEvents = netEvents;
         }
 
         public State CurrentState { get; private set; }
@@ -94,8 +100,18 @@ namespace NpcAdventure.AI
 
         private void ChangeState(State state)
         {
-            this.Monitor.Log($"AI changes state {this.CurrentState} -> {state}");
+            this.Monitor.Log($"AI changes state request {this.CurrentState} -> {state}");
 
+            if (Context.IsMainPlayer)
+            {
+                // if we're main player we're going to dispatch the network update to everybody
+                this.netEvents.FireEvent(new AIChangeState(this.npc, state), null, true);
+            }
+        }
+
+        public void ChangeStateLocal(State state)
+        {
+            this.Monitor.Log($"AI change state activated {this.CurrentState} -> {state}");
             if (this.CurrentController != null)
             {
                 this.CurrentController.Deactivate();
@@ -118,6 +134,9 @@ namespace NpcAdventure.AI
 
         private void CheckPotentialStateChange()
         {
+            if (!Context.IsMainPlayer)
+                return;
+
             if (this.Csm.HasSkillsAny("fighter", "warrior") && this.changeStateCooldown == 0 && this.CurrentState != State.FIGHT && this.PlayerIsNear() && this.IsThereAnyMonster())
             {
                 this.ChangeState(State.FIGHT);

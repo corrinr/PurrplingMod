@@ -80,7 +80,7 @@ namespace NpcAdventure
             this.companionManager = new CompanionManager(this.DialogueDriver, this.HintDriver, this.companionHud, this.config, this.Monitor, this.netEvents);
             this.StuffDriver.RegisterEvents(this.Helper.Events);
 
-            this.netEvents.SetUp(this.ModManifest, this.companionManager);
+            this.netEvents.SetUp(this.ModManifest, this.companionManager, this.contentLoader);
             
             //Harmony
             HarmonyInstance harmony = HarmonyInstance.Create("Purrplingcat.NpcAdventure");

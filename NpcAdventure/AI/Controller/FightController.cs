@@ -257,7 +257,7 @@ namespace NpcAdventure.AI.Controller
 
         public override void Update(UpdateTickedEventArgs e)
         {
-            if (this.IsIdle || (!Context.IsPlayerFree && !Context.IsMultiplayer))
+            if (this.IsIdle)
                 return;
 
             if (this.leader == null)
@@ -275,7 +275,7 @@ namespace NpcAdventure.AI.Controller
         /// </summary>
         private void DoDamage(bool criticalFist = false)
         {
-            if (this.leader == null)
+            if (this.leader == null || !Context.IsMainPlayer)
                 return;
 
             Rectangle effectiveArea = this.follower.GetBoundingBox();
