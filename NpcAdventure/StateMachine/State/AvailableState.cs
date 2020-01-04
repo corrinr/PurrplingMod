@@ -5,6 +5,7 @@ using StardewValley;
 using StardewModdingAPI;
 using System.Collections.Generic;
 using System;
+using static NpcAdventure.NetCode.NetEvents;
 
 namespace NpcAdventure.StateMachine.State
 {
@@ -24,24 +25,17 @@ namespace NpcAdventure.StateMachine.State
         public override void Entry(Farmer byWhom)
         {
             this.setByWhom = byWhom;
-            this.CanCreateDialogue = true;
             this.Events.GameLoop.TimeChanged += this.GameLoop_TimeChanged;
-            if(Game1.IsMasterGame)
+            this.Events.GameLoop.UpdateTicked += this.GameLoop_UpdateTicked;
+            if (Game1.IsMasterGame)
             {
                 this.Events.GameLoop.TimeChanged += this.GameLoop_TimeChanged_Server;
             }
         }
 
-        private void GameLoop_TimeChanged(object sender, TimeChangedEventArgs e)
-        {
-
-        }
-
         private void GameLoop_TimeChanged_Server(object sender, TimeChangedEventArgs e)
         {
             this.recruitRequestsEnabled = true;
-            this.Events.GameLoop.TimeChanged += this.GameLoop_TimeChanged;
-            this.Events.GameLoop.UpdateTicked += this.GameLoop_UpdateTicked;
         }
 
         private void GameLoop_UpdateTicked(object sender, UpdateTickedEventArgs e)
@@ -116,20 +110,6 @@ namespace NpcAdventure.StateMachine.State
                     this.monitor.Log($"Removed adventure suggest dialogue from {this.StateMachine.Companion.Name}");
                 }
             }
-        }
-
-        private float GetSuggestChance()
-        {
-            int firendship = this.StateMachine.CompanionManager.Farmer.getFriendshipLevelForNPC(this.StateMachine.Companion.Name);
-            bool married = Helper.IsSpouseMarriedToFarmer(this.StateMachine.Companion, this.StateMachine.CompanionManager.Farmer);
-            float chance = (0.066f * firendship / 100 / 4) + (Game1.random.Next(-100, 100) / 1000);
-
-            if (married && Game1.random.NextDouble() > 0.7f)
-                chance /= 2;
-
-            this.monitor.VerboseLog($"Suggestion chance for {this.StateMachine.Companion.Name}: {chance}");
-
-            return chance;
         }
 
         private float GetSuggestChance()
@@ -225,17 +205,9 @@ namespace NpcAdventure.StateMachine.State
             return true;
         }
 
-        public void OnDialogueSpeaked(Dialogue speakedDialogue)
+        public void OnDialogueSpeaked(string question, string answer)
         {
-            if (speakedDialogue == this.acceptalDialogue)
-            {
-                this.StateMachine.CompanionManager.Farmer.changeFriendship(40, this.StateMachine.Companion);
-                this.StateMachine.Recruit();
-            }
-            else if (speakedDialogue == this.rejectionDialogue)
-            {
-                this.StateMachine.MakeUnavailable();
-            }
+            
         }
     }
 }

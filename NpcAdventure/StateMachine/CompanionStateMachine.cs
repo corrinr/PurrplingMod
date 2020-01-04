@@ -154,7 +154,7 @@ namespace NpcAdventure.StateMachine
             this.CanSuggestToday = Game1.random.NextDouble() > .5f
                                    && !(this.Companion.isMarried() && SDate.Now().DayOfWeek == DayOfWeek.Monday);
             this.SpokenDialogues.Clear();
-            this.MakeAvailable();
+            this.MakeAvailable(null);
             if (this.CanSuggestToday)
                 this.Monitor.Log($"{this.Name} can suggest adventure today!");
         }

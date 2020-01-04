@@ -28,6 +28,8 @@ namespace NpcAdventure
         internal GameMaster GameMaster { get; private set; }
         internal Config Config { get; private set; } = new Config();
 
+        public static IMonitor GameMonitor { get; private set; }
+
         /// <summary>The mod entry point, called after the mod is first loaded.</summary>
         /// <param name="helper">Provides simplified APIs for writing mods.</param>
         public override void Entry(IModHelper helper)
@@ -82,14 +84,11 @@ namespace NpcAdventure
             this.DialogueDriver = new DialogueDriver(this.Helper.Events);
             this.HintDriver = new HintDriver(this.Helper.Events);
             this.StuffDriver = new StuffDriver(this.Helper.Data, this.Monitor);
-            this.contentLoader = new ContentLoader(this.Helper.Content, this.Helper.ContentPacks, this.ModManifest.UniqueID, "assets", this.Helper.DirectoryPath, this.Monitor);
-            this.companionHud = new CompanionDisplay(this.config, this.ContentLoader);
-            this.CompanionManager = new CompanionManager(this.DialogueDriver, this.HintDriver, this.companionHud, this.config, this.Monitor, this.netEvents);
-            this.StuffDriver.RegisterEvents(this.Helper.Events);
 
-            this.netEvents.SetUp(this.ModManifest, this.companionManager, this.contentLoader);
+            this.netEvents.SetUp(this.ModManifest, this.CompanionManager, this.ContentLoader);
             this.MailDriver = new MailDriver(this.ContentLoader, this.Monitor);
             this.GameMaster = new GameMaster(this.Helper, new StoryHelper(this.ContentLoader), this.Monitor);
+            this.CompanionHud = new CompanionDisplay(this.Config, this.ContentLoader);
             this.CompanionManager = new CompanionManager(this.GameMaster, this.DialogueDriver, this.HintDriver, this.CompanionHud, this.Config, this.Monitor, this.netEvents);
             
             this.StuffDriver.RegisterEvents(this.Helper.Events);

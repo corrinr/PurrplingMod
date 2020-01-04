@@ -71,10 +71,7 @@ namespace NpcAdventure.StateMachine.State
                 this.Events.GameLoop.TimeChanged += this.GameLoop_TimeChanged;
             }
 
-            if (this.BuffManager.HasAssignableBuffs())
-                this.BuffManager.AssignBuffs();
-            else
-                this.monitor.Log($"Companion {this.StateMachine.Name} has no buffs defined!", LogLevel.Alert);
+            this.BuffManager.AssignBuffs();
             this.recruitedDialogue = DialogueHelper.GenerateDialogue(this.StateMachine.Companion, "companionRecruited");
             this.CanPerformAction = true;
 
@@ -85,10 +82,13 @@ namespace NpcAdventure.StateMachine.State
 
             if (byWhom == Game1.player)
             {
-                string text = this.StateMachine.ContentLoader.LoadString($"Strings/Strings:skill.{skill}", this.StateMachine.Companion.displayName)
-                        + Environment.NewLine
-                        + this.StateMachine.ContentLoader.LoadString($"Strings/Strings:skillDescription.{skill}").Replace("#", Environment.NewLine);
-                this.StateMachine.CompanionManager.Hud.AddSkill(skill, text);
+                foreach (string skill in this.StateMachine.Metadata.PersonalSkills)
+                {
+                    string text = this.StateMachine.ContentLoader.LoadString($"Strings/Strings:skill.{skill}", this.StateMachine.Companion.displayName)
+                            + Environment.NewLine
+                            + this.StateMachine.ContentLoader.LoadString($"Strings/Strings:skillDescription.{skill}").Replace("#", Environment.NewLine);
+                    this.StateMachine.CompanionManager.Hud.AddSkill(skill, text);
+                }
             }
 
             this.StateMachine.CompanionManager.Hud.AssignCompanion(this.StateMachine.Companion);
@@ -242,7 +242,7 @@ namespace NpcAdventure.StateMachine.State
             }
 
             // Show above head bubble text for location
-            if (Game1.random.NextDouble() > 66f && DialogueHelper.GetBubbleString(bubbles, companion, e.NewLocation, out string bubble))
+            if (Game1.random.NextDouble() > 66f && DialogueHelper.GetBubbleString(bubbles, companion, to, out string bubble))
                 companion.showTextAboveHead(bubble, preTimer: 250);
 
             // Push new location dialogue

@@ -72,7 +72,7 @@ namespace NpcAdventure.NetCode
             public override void Process(NpcSyncEvent npcEvent, Farmer owner)
             {
                 DialogEvent dialogEvent = (DialogEvent)npcEvent;
-                this.manager.PossibleCompanions[dialogEvent.otherNpc].currentState.ShowDialogue(DialogueHelper.GetDialogueString(this.manager.PossibleCompanions[dialogEvent.otherNpc].Companion, dialogEvent.Dialog));
+                this.manager.PossibleCompanions[dialogEvent.otherNpc].currentState.ShowDialogue(DialogueHelper.GetSpecificDialogueText(this.manager.PossibleCompanions[dialogEvent.otherNpc].Companion, owner, dialogEvent.Dialog));
             }
 
             public override NpcSyncEvent Decode(ModMessageReceivedEventArgs e)
@@ -174,7 +174,7 @@ namespace NpcAdventure.NetCode
             public override void Process(NpcSyncEvent myEvent, Farmer owner)
             {
                 DialogueRequestEvent dre = (DialogueRequestEvent)myEvent;
-                (this.manager.PossibleCompanions[dre.npc].currentState as IRequestedDialogueCreator).CreateRequestedDialogue();
+                (this.manager.PossibleCompanions[dre.npc].currentState as IActionPerformer).PerformAction(owner, owner.currentLocation);
             }
         }
 
