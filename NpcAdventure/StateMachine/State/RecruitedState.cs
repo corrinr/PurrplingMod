@@ -114,7 +114,7 @@ namespace NpcAdventure.StateMachine.State
 
         private void SpecialEvents_RenderedLocation(object sender, ILocationRenderedEventArgs e)
         {
-            if (this.StateMachine.Companion.currentLocation == Game1.currentLocation)
+            if (Game1.getCharacterFromName(this.StateMachine.Companion.Name).currentLocation == Game1.currentLocation)
                 if (this.ai != null)
                     this.ai.Draw(e.SpriteBatch);
         }

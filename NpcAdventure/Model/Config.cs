@@ -14,6 +14,6 @@ namespace NpcAdventure.Model
         public int HeartSuggestThreshold { get; set; } = 7;
         public bool ShowHUD { get; set; } = true;
         public bool EnableDebug { get; set; } = false;
-        public bool AdventureMode { get; set; } = true;
+        public bool AdventureMode { get; set; } = false;
     }
 }

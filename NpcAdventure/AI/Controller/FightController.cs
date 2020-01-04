@@ -492,7 +492,7 @@ namespace NpcAdventure.AI.Controller
                         NpcAdventureMod.GameMonitor.Log("character " + Game1.locations[index].characters[j].Name + " @ " + Game1.locations[index].Name);
                     }
 
-                    Helper.DrawDuringUse(currentFrame, this.follower.FacingDirection, spriteBatch, this.follower.getLocalPosition(Game1.viewport), this.follower, MeleeWeapon.getSourceRect(this.weapon.InitialParentTileIndex), this.weapon.type.Value, this.weapon.isOnSpecial);
+                    Helper.DrawDuringUse(currentFrame, this.follower.FacingDirection, spriteBatch, Game1.getCharacterFromName(this.follower.Name).getLocalPosition(Game1.viewport), this.follower, MeleeWeapon.getSourceRect(this.weapon.InitialParentTileIndex), this.weapon.type.Value, this.weapon.isOnSpecial);
             }
         }
 
