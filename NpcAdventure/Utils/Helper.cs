@@ -8,6 +8,7 @@ using StardewValley.Monsters;
 using xTile.Dimensions;
 using System.Diagnostics.Contracts;
 using System.IO;
+using StardewModdingAPI;
 
 namespace NpcAdventure.Utils
 {
@@ -157,11 +158,13 @@ namespace NpcAdventure.Utils
 
             follower.Halt();
             follower.controller = follower.temporaryController = null;
-            follower.currentLocation?.characters.Remove(follower);
+            if (Context.IsMainPlayer)
+                follower.currentLocation?.characters.Remove(follower);
             follower.currentLocation = location;
             follower.setTilePosition(tilePosition);
 
-            location.addCharacter(follower);
+            if (Context.IsMainPlayer)
+                location.addCharacter(follower);
         }
 
         public static Monster GetNearestMonsterToCharacter(Character me, float tileDistance)

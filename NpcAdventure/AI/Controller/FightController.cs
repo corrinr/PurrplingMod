@@ -1,6 +1,7 @@
 ﻿using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using NpcAdventure.Loader;
+using NpcAdventure.NetCode;
 using NpcAdventure.Utils;
 using StardewModdingAPI;
 using StardewModdingAPI.Events;
@@ -11,6 +12,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using static NpcAdventure.NetCode.NetEvents;
 
 namespace NpcAdventure.AI.Controller
 {
@@ -33,6 +35,8 @@ namespace NpcAdventure.AI.Controller
         private bool defendFistUsed;
         private List<FarmerSprite.AnimationFrame>[] attackAnimation;
         private int attackSpeedPitch = 0;
+
+        private NetEvents netEvents;
 
         public event EventHandler<EventArgs> VisibleChanged;
         public event EventHandler<EventArgs> DrawOrderChanged;
@@ -58,8 +62,9 @@ namespace NpcAdventure.AI.Controller
             }
         }
 
-        public FightController(AI_StateMachine ai, IContentLoader content, IModEvents events, int sword) : base(ai)
+        public FightController(AI_StateMachine ai, IContentLoader content, IModEvents events, int sword, NetEvents netEvents) : base(ai)
         {
+            this.netEvents = netEvents;
             this.attackRadius = 1.25f * Game1.tileSize;
             this.backupRadius = 0.9f * Game1.tileSize;
             this.realLeader = ai.player;
@@ -399,21 +404,26 @@ namespace NpcAdventure.AI.Controller
             return (int)Math.Round(skill) + Game1.random.Next(-10, 10) - swipeDelay + (int)Math.Round(Game1.player.DailyLuck);
         }
 
-        private void AnimateMe()
+        public void AnimateMeLocal(float x, float y, int direction)
         {
             this.attackSpeedPitch = this.GetAttackPitch();
             this.weaponSwingCooldown = this.CooldownTimeout;
             this.defendFistUsed = false;
             this.follower.Sprite.StopAnimation();
-            this.follower.Sprite.faceDirectionStandard(this.GetFacingDirectionFromMovement(new Vector2(this.leader.Position.X, this.leader.Position.Y)));
-            this.follower.Sprite.setCurrentAnimation(this.attackAnimation[this.follower.FacingDirection]);
+            this.follower.Sprite.faceDirectionStandard(this.GetFacingDirectionFromMovement(new Vector2(x, y)));
+            this.follower.Sprite.setCurrentAnimation(this.attackAnimation[direction]);
 
             if (this.weapon != null)
             {
-                this.DoSwipe(this.weapon.type.Value, this.follower.FacingDirection, this.follower);
+                this.DoSwipe(this.weapon.type.Value, direction, this.follower);
             }
 
             this.DoDamage();
+        }
+
+        private void AnimateMe()
+        {
+            this.netEvents.FireEvent(new CompanionAttackAnimation(this.ai.Csm.Companion, this.leader.Position.X, this.leader.Position.Y, this.follower.FacingDirection), null, true);
         }
 
         protected override float GetMovementSpeedBasedOnDistance(float distanceFromTarget)
@@ -471,7 +481,17 @@ namespace NpcAdventure.AI.Controller
                 int tick = Math.Abs(this.weaponSwingCooldown - this.CooldownTimeout);
                 int currentFrame = this.CurrentFrame(tick, duration, frames);
 
-                Helper.DrawDuringUse(currentFrame, this.follower.FacingDirection, spriteBatch, this.follower.getLocalPosition(Game1.viewport), this.follower, MeleeWeapon.getSourceRect(this.weapon.InitialParentTileIndex), this.weapon.type.Value, this.weapon.isOnSpecial);
+                NpcAdventureMod.GameMonitor.Log("Position at X " + this.follower.Position.X + " Y " + this.follower.Position.Y);
+                NpcAdventureMod.GameMonitor.Log("position at X " + this.follower.position.X + " Y " + this.follower.position.Y);
+                NpcAdventureMod.GameMonitor.Log("viewport at X " + Game1.viewport.X + " Y " + Game1.viewport.Y);
+
+                for (int index = 0; index < Game1.locations.Count; ++index)
+                    for (int j = 0; j < Game1.locations[index].characters.Count; j++)
+                    {
+                        NpcAdventureMod.GameMonitor.Log("character " + Game1.locations[index].characters[j].Name + " @ " + Game1.locations[index].Name);
+                    }
+
+                    Helper.DrawDuringUse(currentFrame, this.follower.FacingDirection, spriteBatch, this.follower.getLocalPosition(Game1.viewport), this.follower, MeleeWeapon.getSourceRect(this.weapon.InitialParentTileIndex), this.weapon.type.Value, this.weapon.isOnSpecial);
             }
         }
 

@@ -32,7 +32,7 @@ namespace NpcAdventure.StateMachine
             UNAVAILABLE,
         }
         public CompanionManager CompanionManager { get; private set; }
-        public NPC Companion { get; private set; }
+        public NPC Companion { get; set; }
         public CompanionMetaData Metadata { get; }
         public IContentLoader ContentLoader { get; private set; }
         private IMonitor Monitor { get; }

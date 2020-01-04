@@ -28,6 +28,8 @@ namespace NpcAdventure
         public Config Config { get; }
         public NetEvents netEvents;
 
+        private IContentLoader loader;
+
         public Farmer Farmer
         {
             get
@@ -184,6 +186,7 @@ namespace NpcAdventure
         {
             Dictionary<string, string> dispositions = loader.Load<Dictionary<string, string>>("Data/CompanionDispositions");
 
+            this.PossibleCompanions.Clear();
             foreach (string npcName in dispositions.Keys)
             {
                 NPC companion = Game1.getCharacterFromName(npcName, true);
@@ -205,6 +208,16 @@ namespace NpcAdventure
             }
 
             this.monitor.Log($"Initalized {this.PossibleCompanions.Count} companions.", LogLevel.Info);
+            this.loader = loader;
+        }
+
+        public void ReinitializeNPCs()
+        {
+            Dictionary<string, string> dispositions = this.loader.Load<Dictionary<string, string>>("Data/CompanionDispositions");
+            foreach (string npcName in dispositions.Keys) {
+                CompanionStateMachine xcsm = this.PossibleCompanions[npcName];
+                xcsm.Companion = Game1.getCharacterFromName(npcName, true);
+            }
         }
 
         /// <summary>

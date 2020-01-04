@@ -72,7 +72,7 @@ namespace NpcAdventure.AI
             this.controllers = new Dictionary<State, IController>()
             {
                 [State.FOLLOW] = new FollowController(this),
-                [State.FIGHT] = new FightController(this, this.loader, this.events, this.Csm.Metadata.Sword),
+                [State.FIGHT] = new FightController(this, this.loader, this.events, this.Csm.Metadata.Sword, this.netEvents),
                 [State.IDLE] = new IdleController(this, this.loader),
             };
 

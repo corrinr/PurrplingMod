@@ -102,10 +102,9 @@ namespace NpcAdventure.StateMachine.State
 
         private void SpecialEvents_RenderedLocation(object sender, ILocationRenderedEventArgs e)
         {
-            if (this.ai != null)
-            {
-                this.ai.Draw(e.SpriteBatch);
-            }
+            if (this.StateMachine.Companion.currentLocation == Game1.currentLocation)
+                if (this.ai != null)
+                    this.ai.Draw(e.SpriteBatch);
         }
 
         /// <summary>
@@ -222,7 +221,7 @@ namespace NpcAdventure.StateMachine.State
 
         private void Player_Warped(object sender, WarpedEventArgs e)
         {
-            this.StateMachine.CompanionManager.netEvents.FireEvent(new PlayerWarpedEvent(this.StateMachine.Companion, e.OldLocation, e.NewLocation));
+            this.StateMachine.CompanionManager.netEvents.FireEvent(new PlayerWarpedEvent(this.StateMachine.Companion, e.OldLocation, e.NewLocation), null, true);
         }
 
         private bool TryPushLocationDialogue(GameLocation location)

@@ -1,4 +1,5 @@
-﻿using NpcAdventure.Loader;
+﻿using NpcAdventure.AI.Controller;
+using NpcAdventure.Loader;
 using NpcAdventure.StateMachine;
 using NpcAdventure.StateMachine.State;
 using NpcAdventure.StateMachine.StateFeatures;
@@ -51,6 +52,7 @@ namespace NpcAdventure.NetCode
                 {SendChestEvent.EVENTNAME, new NetEventChestSent(manager)},
                 {AIChangeState.EVENTNAME, new NetEventAIChangeState(manager)},
                 {ShowHUDMessageHealed.EVENTNAME, new NetEventHUDMessageHealed(manager, loader)},
+                {CompanionAttackAnimation.EVENTNAME, new NetEventCompanionAttackAnimation(manager)},
             };
         }
 
@@ -335,6 +337,39 @@ namespace NpcAdventure.NetCode
             }
         }
 
+        private class NetEventCompanionAttackAnimation : NetEventProcessor
+        {
+            private CompanionManager manager;
+
+            public NetEventCompanionAttackAnimation(CompanionManager manager)
+            {
+                this.manager = manager;
+            }
+
+            public override NpcSyncEvent Decode(ModMessageReceivedEventArgs e)
+            {
+                return e.ReadAs<CompanionAttackAnimation>();
+            }
+
+            public override void Process(NpcSyncEvent myEvent, Farmer owner)
+            {
+                CompanionAttackAnimation caa = (CompanionAttackAnimation)myEvent;
+                RecruitedState rs = manager.PossibleCompanions[caa.npc].currentState as RecruitedState;
+                if (rs != null)
+                {
+                    FightController fc = rs.ai.CurrentController as FightController;
+                    if (fc != null)
+                    {
+                        //fc.AnimateMeLocal(caa.x, caa.y, caa.direction);
+                        Character character = Game1.getCharacterFromName(caa.npc, true);
+                        string posIsNull = (character == null ? "yes" : "no");
+                        NpcAdventureMod.GameMonitor.Log("character " + caa.npc + " is null ? " + posIsNull + " am I a master?" + (Context.IsMainPlayer ? "yes" : "no"));
+                        fc.AnimateMeLocal(character.Position.X, character.Position.Y, caa.direction);
+                    }
+                }
+            }
+        }
+
         private class NetEventCompanionChangedState : NetEventProcessor
         {
             private CompanionManager manager;
@@ -371,6 +406,9 @@ namespace NpcAdventure.NetCode
 
                         break;
                 }
+
+                if (!Context.IsMainPlayer)
+                    this.manager.ReinitializeNPCs();
 
             }
         }
@@ -658,6 +696,26 @@ namespace NpcAdventure.NetCode
             public override object[] gatherArgs()
             {
                 return new object[] { this.npc, this.health };
+            }
+        }
+
+        public class CompanionAttackAnimation : NpcSyncEvent
+        {
+            public const string EVENTNAME = "companionAttackAnimation";
+
+            public string npc;
+            public float x;
+            public float y;
+            public int direction;
+
+            public CompanionAttackAnimation() { }
+
+            public CompanionAttackAnimation(NPC n, float x, float y, int direction) : base(EVENTNAME)
+            {
+                this.npc = n.Name;
+                this.x = x;
+                this.y = y;
+                this.direction = direction;
             }
         }
     }
