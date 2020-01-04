@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
 using NpcAdventure.StateMachine;
 using StardewValley;
 using StardewModdingAPI;
@@ -11,10 +10,11 @@ using NpcAdventure.Utils;
 using NpcAdventure.StateMachine.State;
 using static NpcAdventure.StateMachine.CompanionStateMachine;
 using NpcAdventure.Model;
-using Microsoft.Xna.Framework.Graphics;
 using NpcAdventure.Events;
 using NpcAdventure.NetCode;
 using NpcAdventure.HUD;
+using NpcAdventure.Story;
+using NpcAdventure.Story.Messaging;
 
 namespace NpcAdventure
 {
@@ -23,7 +23,9 @@ namespace NpcAdventure
         private readonly DialogueDriver dialogueDriver;
         private readonly HintDriver hintDriver;
         private readonly IMonitor monitor;
+
         public Dictionary<string, CompanionStateMachine> PossibleCompanions { get; }
+        public IGameMaster GameMaster { get; }
         public CompanionDisplay Hud { get; }
         public Config Config { get; }
         public NetEvents netEvents;
@@ -40,17 +42,17 @@ namespace NpcAdventure
             }
         }
 
-        public CompanionManager(DialogueDriver dialogueDriver, HintDriver hintDriver, CompanionDisplay hud, Config config, IMonitor monitor, NetEvents netEvents)
+        public CompanionManager(IGameMaster gameMaster, DialogueDriver dialogueDriver, HintDriver hintDriver, CompanionDisplay hud, Config config, IMonitor monitor, NetEvents netEvents)
         {
+            this.GameMaster = gameMaster ?? throw new ArgumentNullException(nameof(gameMaster));
             this.dialogueDriver = dialogueDriver ?? throw new ArgumentNullException(nameof(dialogueDriver));
             this.hintDriver = hintDriver ?? throw new ArgumentNullException(nameof(hintDriver));
-            this.Hud = hud;
+            this.Hud = hud ?? throw new ArgumentNullException(nameof(hud));
             this.monitor = monitor ?? throw new ArgumentNullException(nameof(monitor));
             this.PossibleCompanions = new Dictionary<string, CompanionStateMachine>();
-            this.Config = config;
+            this.Config = config ?? throw new ArgumentNullException(nameof(config));
             this.netEvents = netEvents;
 
-            this.dialogueDriver.DialogueRequested += this.DialogueDriver_DialogueRequested;
             this.dialogueDriver.DialogueChanged += this.DialogueDriver_DialogueChanged;
             this.hintDriver.CheckHint += this.HintDriver_CheckHint;
         }
@@ -92,26 +94,37 @@ namespace NpcAdventure
             // - and has'nt any dialogues in queue 
             // - and we can ask this companion for following (recruit)
             if (this.PossibleCompanions.TryGetValue(e.Npc.Name, out CompanionStateMachine csm)
+                && this.CanRecruit()
                 && csm.Name == e.Npc?.Name
-                && csm.CanDialogueRequestResolve()
+                && csm.CanPerformAction()
                 && e.Npc.CurrentDialogue.Count == 0
-                && Helper.CanRequestDialog(this.Farmer, e.Npc))
+                && Helper.CanRequestDialog(this.Farmer, e.Npc, csm.CurrentStateFlag == StateFlag.RECRUITED))
             {
                 this.hintDriver.ShowHint(HintDriver.Hint.DIALOGUE);
             }
         }
 
-        /// <summary>
-        /// Handle requested dialogue event
-        /// </summary>
-        /// <param name="sender">Who sent this event?</param>
-        /// <param name="e">Dialogue event arguments</param>
-        private void DialogueDriver_DialogueRequested(object sender, DialogueRequestArgs e)
+        public bool CheckAction(Farmer who, NPC withWhom, GameLocation location)
         {
-            if (this.PossibleCompanions.TryGetValue(e.WithWhom.Name, out CompanionStateMachine csm) && csm.Name == e.WithWhom.Name)
+            if (this.PossibleCompanions.TryGetValue(withWhom.Name, out CompanionStateMachine csm) && csm.Name == withWhom.Name)
             {
-                csm.ResolveDialogueRequest();
+                return csm.CheckAction(who, location);
             }
+
+            return false;
+        }
+
+        internal bool CanRecruit()
+        {
+            if (!Context.IsWorldReady || this.Farmer == null)
+            {
+                return false;
+            }
+
+            if (this.GameMaster.Mode == GameMasterMode.OFFLINE)
+                return true; // In non-adventure mode we can recruit a companion
+
+            return this.GameMaster.Data.GetPlayerState(this.Farmer).isEligible;
         }
 
         /// <summary>

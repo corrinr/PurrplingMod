@@ -9,6 +9,7 @@ using xTile.Dimensions;
 using System.Diagnostics.Contracts;
 using System.IO;
 using StardewModdingAPI;
+using NpcAdventure.Compatibility;
 
 namespace NpcAdventure.Utils
 {
@@ -42,21 +43,27 @@ namespace NpcAdventure.Utils
                    && spouse.getSpouse()?.spouse == spouse.Name;
         }
 
-        public static bool CanRequestDialog(Farmer farmer, NPC npc)
+        public static bool CanRequestDialog(Farmer farmer, NPC npc, bool overrideKissCheck = false)
         {
             // Can't request dialogue if giftable object is in farmer's hands or npc has current dialogues
             bool forbidden = (farmer.ActiveObject != null && farmer.ActiveObject.canBeGivenAsGift()) || npc.CurrentDialogue.Count > 0;
+            bool isMarried = IsSpouseMarriedToFarmer(npc, farmer);
+            bool canKiss = isMarried || (bool)TPMC.Instance?.CustomKissing.CanKissNpc(farmer, npc);
 
-            if (!forbidden && IsSpouseMarriedToFarmer(npc, farmer))
-            {
-                // Kiss married spouse first if she/he facing kissable
-                bool kissedToday = SpouseHasBeenKissedToday(npc);
-                forbidden = !kissedToday && npc.FacingDirection == 3 || !kissedToday && npc.FacingDirection == 1;
-            }
+            // Kiss spouse first if she/he facing kissable                     
+            forbidden |= canKiss && !SpouseHasBeenKissedToday(npc) && (npc.FacingDirection == 3 || npc.FacingDirection == 1) && !overrideKissCheck;
+            // Check for possibly marriage dialogues to show if farmer is married to this spouse
+            forbidden |= isMarried && npc.shouldSayMarriageDialogue.Value && npc.currentMarriageDialogue.Count > 0;
+            // Can't request dialogue for invisible, sleeaping NPCs or farmer is riding horse
+            forbidden |= npc.IsInvisible || npc.isSleeping.Value || farmer.isRidingHorse();
+            // If farmer wears mayor's shorts and try request dialogue of Marnie or Lewis, avoid to request dialogue (and play animations)
+            forbidden |= farmer.pantsItem.Value != null && farmer.pantsItem.Value.parentSheetIndex == 15 && (npc.Name.Equals("Lewis") || npc.Name.Equals("Marnie"));
+            // Avoid request dialogue if farmer and NPC is know each other
+            forbidden |= !farmer.friendshipData.ContainsKey(npc.Name) && Game1.NPCGiftTastes.ContainsKey(npc.Name);
 
             return !forbidden;
         }
-
+                                          
         public static List<Point> NearPoints(Point p, int distance)
         {
             List<Point> points = new List<Point>();

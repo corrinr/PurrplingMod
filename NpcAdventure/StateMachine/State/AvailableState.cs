@@ -5,16 +5,17 @@ using StardewValley;
 using StardewModdingAPI;
 using System.Collections.Generic;
 using System;
-using static NpcAdventure.NetCode.NetEvents;
 
 namespace NpcAdventure.StateMachine.State
 {
-    internal class AvailableState : CompanionState, IRequestedDialogueCreator, IDialogueDetector
+    internal class AvailableState : CompanionState, IActionPerformer, IDialogueDetector
     {
         private Dialogue acceptalDialogue;
+        private Dialogue rejectionDialogue;
         private Dialogue suggestionDialogue;
+        private bool recruitRequestsEnabled;
 
-        public bool CanCreateDialogue { get; private set; }
+        public bool CanPerformAction { get => this.recruitRequestsEnabled && this.StateMachine.CompanionManager.CanRecruit(); }
 
         private int doNotAskUntil;
 
@@ -38,46 +39,72 @@ namespace NpcAdventure.StateMachine.State
 
         private void GameLoop_TimeChanged_Server(object sender, TimeChangedEventArgs e)
         {
-            if (this.StateMachine.CompanionManager == null)
-            {
-                return;
-            }
+            this.recruitRequestsEnabled = true;
+            this.Events.GameLoop.TimeChanged += this.GameLoop_TimeChanged;
+            this.Events.GameLoop.UpdateTicked += this.GameLoop_UpdateTicked;
+        }
 
-            if (this.CanCreateDialogue == false && e.NewTime > this.doNotAskUntil)
-                this.CanCreateDialogue = true;
+        private void GameLoop_UpdateTicked(object sender, UpdateTickedEventArgs e)
+        {
+            var dialogueStack = this.StateMachine.Companion.CurrentDialogue;
+            if (e.IsMultipleOf(15) && this.suggestionDialogue != null && !dialogueStack.Contains(this.suggestionDialogue) && dialogueStack.Count == 0)
+            {
+                // Push suggest dialogue again when companion mind is free and we have created that suggestion dialogue and this dialogue is not already in stack
+                this.StateMachine.Companion.CurrentDialogue.Push(this.suggestionDialogue);
+                this.monitor.Log($"Adventure suggest dialogue for {this.StateMachine.Companion.Name} pushed into stack!");
+            }
+        }
+
+        private void GameLoop_TimeChanged(object sender, TimeChangedEventArgs e)
+        {
+            if (this.recruitRequestsEnabled == false && e.NewTime > this.doNotAskUntil)
+                this.recruitRequestsEnabled = true;
 
             int heartLevel = this.StateMachine.CompanionManager.Farmer.getFriendshipHeartLevelForNPC(this.StateMachine.Companion.Name);
+            int threshold = this.StateMachine.CompanionManager.Config.HeartSuggestThreshold;
+            bool married = Helper.IsSpouseMarriedToFarmer(this.StateMachine.Companion, this.StateMachine.CompanionManager.Farmer);
+            bool matchesTimeRange = e.NewTime < 2200 && e.NewTime > (married ? 800 : 1000);
 
-            if (this.CanCreateDialogue && e.NewTime < 2200 && this.suggestionDialogue == null && heartLevel > 4 && Game1.random.NextDouble() < this.GetSuggestChance())
+            if (!this.StateMachine.SuggestedToday
+                && this.StateMachine.CanSuggestToday
+                && this.CanPerformAction
+                && matchesTimeRange
+                && this.suggestionDialogue == null
+                && heartLevel >= threshold
+                && Game1.random.NextDouble() < this.GetSuggestChance())
             {
                 Dialogue d = DialogueHelper.GenerateDialogue(this.StateMachine.Companion, "companionSuggest");
+                Farmer f = this.StateMachine.CompanionManager.Farmer;
 
                 if (d == null)
                     return; // No dialogue defined, nothing to suggest
 
                 // Add reaction on adventure suggestion acceptance/rejectance question
-                d.answerQuestionBehavior = new Dialogue.onAnswerQuestion((whichResponse) => {
+                d.answerQuestionBehavior = new Dialogue.onAnswerQuestion((whichResponse) =>
+                {
                     List<Response> opts = d.getResponseOptions();
                     NPC n = this.StateMachine.Companion;
 
                     if (opts[whichResponse].responseKey == "Yes")
                     {
                         // Farmer accepted suggestion of adventure. Let's go to find a some trouble!
-                        this.acceptalDialogue = new Dialogue(DialogueHelper.GetDialogueString(n, "companionSuggest_Yes"), n);
+                        this.acceptalDialogue = new Dialogue(DialogueHelper.GetSpecificDialogueText(n, f, "companionSuggest_Yes"), n);
                         DialogueHelper.DrawDialogue(this.acceptalDialogue);
                     } else
                     {
                         // Farmer not accepted for this time. Farmer can't ask to follow next 2 hours
-                        this.CanCreateDialogue = false;
-                        this.doNotAskUntil = e.NewTime + 200;
-                        DialogueHelper.DrawDialogue(new Dialogue(DialogueHelper.GetDialogueString(n, "companionSuggest_No"), n));
+                        this.recruitRequestsEnabled = false;
+                        this.doNotAskUntil = Game1.timeOfDay + 200;
+                        DialogueHelper.DrawDialogue(new Dialogue(DialogueHelper.GetSpecificDialogueText(n, f, "companionSuggest_No"), n));
                     }
 
                     this.suggestionDialogue = null;
+                    this.StateMachine.SuggestedToday = true;
+
                     return false;
                 });
+
                 this.suggestionDialogue = d;
-                this.StateMachine.Companion.CurrentDialogue.Push(d);
                 this.monitor.Log($"Added adventure suggest dialogue to {this.StateMachine.Companion.Name}");
             } else if (this.suggestionDialogue != null)
             {
@@ -93,21 +120,36 @@ namespace NpcAdventure.StateMachine.State
 
         private float GetSuggestChance()
         {
-            int heartLevel = this.StateMachine.CompanionManager.Farmer.getFriendshipHeartLevelForNPC(this.StateMachine.Companion.Name);
+            int firendship = this.StateMachine.CompanionManager.Farmer.getFriendshipLevelForNPC(this.StateMachine.Companion.Name);
             bool married = Helper.IsSpouseMarriedToFarmer(this.StateMachine.Companion, this.StateMachine.CompanionManager.Farmer);
-            float chance = 0.066f * heartLevel;
+            float chance = (0.066f * firendship / 100 / 4) + (Game1.random.Next(-100, 100) / 1000);
 
-            if (married)
+            if (married && Game1.random.NextDouble() > 0.7f)
                 chance /= 2;
+
+            this.monitor.VerboseLog($"Suggestion chance for {this.StateMachine.Companion.Name}: {chance}");
+
+            return chance;
+        }
+
+        private float GetSuggestChance()
+        {
+            int firendship = this.StateMachine.CompanionManager.Farmer.getFriendshipLevelForNPC(this.StateMachine.Companion.Name);
+            bool married = Helper.IsSpouseMarriedToFarmer(this.StateMachine.Companion, this.StateMachine.CompanionManager.Farmer);
+            float chance = (0.066f * firendship / 100 / 4) + (Game1.random.Next(-100, 100) / 1000);
+
+            if (married && Game1.random.NextDouble() > 0.7f)
+                chance /= 2;
+
+            this.monitor.VerboseLog($"Suggestion chance for {this.StateMachine.Companion.Name}: {chance}");
 
             return chance;
         }
 
         public override void Exit()
         {
+            this.Events.GameLoop.UpdateTicked -= this.GameLoop_UpdateTicked;
             this.Events.GameLoop.TimeChanged -= this.GameLoop_TimeChanged;
-            this.CanCreateDialogue = false;
-            this.suggestionDialogue = null;
         }
 
         public void Recruit(Farmer byWhom)
@@ -156,30 +198,44 @@ namespace NpcAdventure.StateMachine.State
             }
         }
 
-        public void CreateRequestedDialogue(string receivedAnswer = null)
+        public bool PerformAction(Farmer who, GameLocation location)
         {
-            Farmer leader = this.StateMachine.CompanionManager.Farmer;
             NPC companion = this.StateMachine.Companion;
-            GameLocation location = this.StateMachine.CompanionManager.Farmer.currentLocation;
             string question = this.StateMachine.ContentLoader.LoadString("Strings/Strings:askToFollow", companion.displayName);
+
+            if (companion.isMoving())
+            {
+                companion.Halt();
+                companion.facePlayer(who);
+            }
 
             location.createQuestionDialogue(question, location.createYesNoResponses(), (_, answer) =>
             {
                 if (answer == "Yes")
                 {
-                    this.StateMachine.CompanionManager.netEvents.FireEvent(new CompanionRequestEvent(this.StateMachine.Companion));
+                    if (!this.StateMachine.Companion.doingEndOfRouteAnimation.Value)
+                    {
+                        this.StateMachine.Companion.Halt();
+                        this.StateMachine.Companion.facePlayer(who);
+                    }
+                    this.ReactOnAnswer(this.StateMachine.Companion, who);
                 }
             }, null);
+
+            return true;
         }
 
-        public void OnDialogueSpeaked(string question, string answer) // XXXX taky jenom na serveru
+        public void OnDialogueSpeaked(Dialogue speakedDialogue)
         {
-
-        }
-
-        public void CreateRequestedDialogue()
-        {
-            CreateRequestedDialogue(null);
+            if (speakedDialogue == this.acceptalDialogue)
+            {
+                this.StateMachine.CompanionManager.Farmer.changeFriendship(40, this.StateMachine.Companion);
+                this.StateMachine.Recruit();
+            }
+            else if (speakedDialogue == this.rejectionDialogue)
+            {
+                this.StateMachine.MakeUnavailable();
+            }
         }
     }
 }

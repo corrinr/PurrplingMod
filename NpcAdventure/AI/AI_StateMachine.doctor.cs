@@ -1,4 +1,5 @@
-﻿using NpcAdventure.Utils;
+﻿using Microsoft.Xna.Framework;
+using NpcAdventure.Utils;
 using StardewModdingAPI;
 using StardewModdingAPI.Events;
 using StardewValley;
@@ -30,9 +31,10 @@ namespace NpcAdventure.AI
                 if (this.player.health > this.player.maxHealth)
                     this.player.health = this.player.maxHealth;
 
-                this.netEvents.FireEvent(new DialogEvent("heal", this.npc), this.player);
+                this.netEvents.FireEvent(new DialogEvent("heal", this.npc), this.player); // DialogueHelper.GetSpecificDialogueText(this.npc, this.player, "heal")
 
                 this.netEvents.FireEvent(new ShowHUDMessageHealed(this.npc, health), this.player);
+                this.hud.GlowSkill("doctor", Color.Lime, HEAL_COUNTDOWN / 60); // TODO move to the proper side
                 this.Monitor.Log($"{this.npc.Name} healed you! Remaining medkits: {this.medkits}", LogLevel.Info);
                 return true;
             }

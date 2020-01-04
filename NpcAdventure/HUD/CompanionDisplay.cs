@@ -3,17 +3,20 @@ using Microsoft.Xna.Framework.Graphics;
 using NpcAdventure.AI;
 using NpcAdventure.Loader;
 using NpcAdventure.Model;
+using StardewModdingAPI;
 using StardewModdingAPI.Events;
 using StardewValley;
 using StardewValley.Menus;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace NpcAdventure.HUD
 {
     class CompanionDisplay : Internal.IDrawable, Internal.IUpdateable
     {
-        public List<CompanionSkill> Skills { get; }
+        public Dictionary<string, CompanionSkill> Skills { get; }
+        public Dictionary<SButton, ClickableTextureComponent> Keys { get; }
         public Config Config { get; }
 
         private NPC companion;
@@ -24,14 +27,15 @@ namespace NpcAdventure.HUD
 
         public CompanionDisplay(Config config, IContentLoader contentLoader)
         {
-            this.Skills = new List<CompanionSkill>();
+            this.Skills = new Dictionary<string, CompanionSkill>();
+            this.Keys = new Dictionary<SButton, ClickableTextureComponent>();
             this.Config = config;
             this.contentLoader = contentLoader;
         }
 
         public void AddSkill(string type, string description)
         {
-            this.Skills.Add(new CompanionSkill(type, description));
+            this.Skills.Add(type, new CompanionSkill(type, description));
         }
 
         public void SetCompanionState(AI.AI_StateMachine.State state)
@@ -54,9 +58,16 @@ namespace NpcAdventure.HUD
             this.avatar = new ClickableTextureComponent("", Rectangle.Empty, null, hoverText, companion.Sprite.Texture, companion.getMugShotSourceRect(), 4f, false);
         }
 
+        public void AddKey(SButton key, string description)
+        {
+            var component = new ClickableTextureComponent("", Rectangle.Empty, null, description, Game1.mouseCursors, new Rectangle(473, 36, 24, 24), 2.5f, false);
+            this.Keys.Add(key, component);
+        }
+
         public void Reset()
         {
             this.Skills.Clear();
+            this.Keys.Clear();
             this.avatar = null;
         }
 
@@ -75,6 +86,11 @@ namespace NpcAdventure.HUD
                 this.DrawAvatar(spriteBatch);
             }
 
+            if (this.Keys.Count > 0)
+            {
+                this.DrawKeysHelp(spriteBatch);
+            }
+
             if (!string.IsNullOrEmpty(this.hoverText))
             {
                 IClickableMenu.drawHoverText(spriteBatch, this.hoverText, Game1.smallFont);
@@ -84,10 +100,11 @@ namespace NpcAdventure.HUD
         public void DrawSkills(SpriteBatch spriteBatch)
         {
             Vector2 position = new Vector2(Game1.viewport.Width - 80 - IClickableMenu.borderWidth, 390);
+            var skills = this.Skills.Values.ToList();
 
-            for (int i = 0; i < this.Skills.Count; i++)
+            for (int i = 0; i < skills.Count; i++)
             {
-                var skill = this.Skills[i];
+                var skill = skills[i];
                 float xOffset = 50;
                 float iconOffset = 16;
                 float iconGrid = 68;
@@ -130,6 +147,22 @@ namespace NpcAdventure.HUD
             spriteBatch.Draw(Game1.mouseCursors, new Vector2(position.X + 54, position.Y + 78), icon, Color.White * 1f, 0f, Vector2.Zero, 3f, SpriteEffects.None, 1f);
         }
 
+        public void DrawKeysHelp(SpriteBatch spriteBatch)
+        {
+            Vector2 position = new Vector2(0, Game1.viewport.Height * 0.333f - (this.Keys.Count * 34) / 2);
+            if (Game1.isOutdoorMapSmallerThanViewport())
+                position.X = Math.Max(position.X, -Game1.viewport.X);
+            Utility.makeSafe(ref position, 64, 64);
+            
+            for(int i = 0; i < this.Keys.Count; i++)
+            {
+                var keyIconPair = this.Keys.ElementAt(i);
+                keyIconPair.Value.bounds = new Rectangle((int)position.X + 16, (int)position.Y + (i * 70), 48, 48);
+                keyIconPair.Value.draw(spriteBatch, Color.White, 1);
+                spriteBatch.DrawString(Game1.smallFont, keyIconPair.Key.ToString(), new Vector2(keyIconPair.Value.bounds.X + keyIconPair.Value.bounds.Width / 2 - 4, (float)keyIconPair.Value.bounds.Y + keyIconPair.Value.bounds.Height / 2 - 8), Color.White);
+            }
+        }
+
         public void PerformHoverAction(int x, int y)
         {
             this.hoverText = "";
@@ -141,21 +174,40 @@ namespace NpcAdventure.HUD
                     this.hoverText = this.avatar.hoverText;
             }
 
-            foreach (var skill in this.Skills)
+            foreach (var skill in this.Skills.Values)
             {
                 skill.PerformHoverAction(x, y);
                 if (skill.ShowTooltip)
-                    this.hoverText = skill.HoverText;
+                {
+                    this.hoverText = skill.HoverText + (skill.Glowing ? (Environment.NewLine + this.contentLoader.LoadString("Strings/Strings:hudSkillUsed")) : "");
+                }
 
+            }
+
+            foreach (var key in this.Keys.Values)
+            {
+                if (key.containsPoint(x, y))
+                {
+                    this.hoverText = key.hoverText;
+                    break;
+                }
             }
         }
 
         public void Update(UpdateTickedEventArgs e)
         {
-            foreach (var skill in this.Skills)
+            foreach (var skill in this.Skills.Values)
                 skill.Update(e);
 
             this.PerformHoverAction(Game1.getMouseX(), Game1.getMouseY());
+        }
+
+        internal void GlowSkill(string type, Color color, int duration)
+        {
+            if (this.Skills.TryGetValue(type, out CompanionSkill skill))
+            {
+                skill.Glow(color, duration);
+            }
         }
     }
 }
