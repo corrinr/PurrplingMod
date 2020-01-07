@@ -80,6 +80,9 @@ namespace NpcAdventure
         {
             if (Context.IsWorldReady && this.CompanionHud != null)
                 this.CompanionHud.Update(e);
+
+            if (!Context.IsMainPlayer && e.IsMultipleOf(60 * 10) && Context.IsWorldReady) // sync bag every 10 seconds if changed
+                this.CompanionManager.SyncLocalBags();
         }
 
         private void GameLoop_GameLaunched(object sender, GameLaunchedEventArgs e)

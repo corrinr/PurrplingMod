@@ -78,7 +78,7 @@ namespace NpcAdventure.StateMachine
         private void ChangeState(StateFlag stateFlag, Farmer byWhom)
         {
             if (!Context.IsMainPlayer && this.CurrentStateFlag == StateFlag.RECRUITED && stateFlag != StateFlag.RECRUITED) // sync bag status to server when we're leaving recruited state
-                this.CompanionManager.netEvents.FireEvent(new SendChestEvent(this.Companion, this.Bag));
+                this.CompanionManager.netEvents.FireEvent(new SendBagEvent(this.Companion, this.Bag));
 
             if (this.States == null)
                 throw new InvalidStateException("State machine is not ready! Call setup first.");
@@ -272,24 +272,7 @@ namespace NpcAdventure.StateMachine
 
         public void MakeLocalUnavailable(Farmer byWhom)
         {
-            if (byWhom != null)
-            {
-                NpcAdventureMod.GameMonitor.Log("Setting unavailable by " + byWhom.Name);
-            } else
-            {
-                NpcAdventureMod.GameMonitor.Log("Setting unavailable by NOBODY");
-            }
-            
             this.ChangeState(StateFlag.UNAVAILABLE, byWhom);
-            if (this.currentState.GetByWhom() != null)
-            {
-                NpcAdventureMod.GameMonitor.Log("New state " + this.CurrentStateFlag.ToString() + " by " + this.currentState.GetByWhom().Name);
-            }
-            else
-            {
-                NpcAdventureMod.GameMonitor.Log("Set unavailable by NOBODY");
-            }
-            
         }
 
         /// <summary>

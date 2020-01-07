@@ -15,6 +15,7 @@ using NpcAdventure.NetCode;
 using NpcAdventure.HUD;
 using NpcAdventure.Story;
 using NpcAdventure.Story.Messaging;
+using static NpcAdventure.NetCode.NetEvents;
 
 namespace NpcAdventure
 {
@@ -87,6 +88,15 @@ namespace NpcAdventure
                 {
                     csm.ReseatCompanion(n);
                 }
+            }
+        }
+
+        internal void SyncLocalBags()
+        {
+            foreach(var csmKv in this.PossibleCompanions)
+            {
+                if (csmKv.Value.currentState.GetByWhom() == Game1.player && csmKv.Value.CurrentStateFlag == StateFlag.RECRUITED)
+                    this.netEvents.FireEvent(new SendBagEvent(csmKv.Value.Companion, csmKv.Value.Bag));
             }
         }
 
@@ -249,6 +259,18 @@ namespace NpcAdventure
 
             this.PossibleCompanions.Clear();
             this.monitor.Log("Companions uninitialized", LogLevel.Info);
+        }
+
+        internal void PlayerDisconnected(Farmer farmer)
+        {
+            foreach (var companionKv in this.PossibleCompanions)
+            {
+                if (companionKv.Value.CurrentStateFlag == StateFlag.RECRUITED && companionKv.Value.currentState.GetByWhom() == farmer)
+                {
+                    this.monitor.Log("Resetting companion " + companionKv.Key + " to unavailable state as player has disconnected.");
+                    companionKv.Value.MakeUnavailable(farmer);
+                }
+            }
         }
     }
 }

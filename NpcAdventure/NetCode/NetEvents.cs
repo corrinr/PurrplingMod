@@ -50,7 +50,7 @@ namespace NpcAdventure.NetCode
                 {CompanionChangedState.EVENTNAME, new NetEventCompanionChangedState(manager)},
                 {CompanionStateRequest.EVENTNAME, new NetEventCompanionStateRequest(manager, this)},
                 {CompanionDismissEvent.EVENTNAME, new NetEventDismissNPC(manager)},
-                {SendChestEvent.EVENTNAME, new NetEventChestSent(manager)},
+                {SendBagEvent.EVENTNAME, new NetEventBagSent(manager)},
                 {AIChangeState.EVENTNAME, new NetEventAIChangeState(manager)},
                 {ShowHUDMessageHealed.EVENTNAME, new NetEventHUDMessageHealed(manager, loader)},
                 {CompanionAttackAnimation.EVENTNAME, new NetEventCompanionAttackAnimation(manager)},
@@ -307,22 +307,28 @@ namespace NpcAdventure.NetCode
             }
         }
 
-        private class NetEventChestSent : NetEventProcessor
+        private class NetEventBagSent : NetEventProcessor
         {
             private CompanionManager manager;
-            public NetEventChestSent(CompanionManager manager)
+            public NetEventBagSent(CompanionManager manager)
             {
                 this.manager = manager;
             }
 
             public override NpcSyncEvent Decode(ModMessageReceivedEventArgs e)
             {
-                return e.ReadAs<SendChestEvent>();
+                return e.ReadAs<SendBagEvent>();
             }
 
             public override void Process(NpcSyncEvent myEvent, Farmer owner)
             {
-                SendChestEvent sce = myEvent as SendChestEvent;
+                SendBagEvent sce = myEvent as SendBagEvent;
+                if (this.manager.PossibleCompanions[sce.npc].currentState.GetByWhom() != owner)
+                {
+                    NpcAdventureMod.GameMonitor.Log("Somebody who has not set this state tried setting the bag of this NPC! I'm skipping this.", LogLevel.Warn);
+                    return;
+                }
+
                 MemoryStream stream = new MemoryStream();
                 byte[] data = Convert.FromBase64String(sce.chestContents);
                 stream.Write(data, 0, data.Length);
@@ -410,6 +416,33 @@ namespace NpcAdventure.NetCode
         {
             events.Multiplayer.ModMessageReceived += this.OnMessageReceived;
             events.Specialized.LoadStageChanged += this.OnLoadStageChanged;
+            events.Multiplayer.PeerDisconnected += this.OnPeerDisconnected;
+            events.Multiplayer.PeerContextReceived += this.PeerContextReceived;
+        }
+
+        private void PeerContextReceived(object sender, PeerContextReceivedEventArgs e)
+        {
+            bool foundRemoteMod = false;
+            foreach (var mod in e.Peer.Mods)
+            {
+                if (mod.ID == this.modManifest.UniqueID && mod.Version == this.modManifest.Version)
+                    foundRemoteMod = true;
+            }
+
+            if (!foundRemoteMod)
+            {
+                NpcAdventureMod.GameMonitor.Log("Disconnecting remote player as he doesn't have this mod in the same version!");
+                // TODO disconnect the remote when I figure out how :V
+            }
+        }
+
+        private void OnPeerDisconnected(object sender, PeerDisconnectedEventArgs e)
+        {
+            Farmer farmer = Game1.getFarmerMaybeOffline(e.Peer.PlayerID);
+            if (farmer == null)
+                return;
+
+            this.companionManager.PlayerDisconnected(farmer);
         }
 
         private void OnLoadStageChanged(object sender, LoadStageChangedEventArgs e)
@@ -424,20 +457,12 @@ namespace NpcAdventure.NetCode
             if (isBroadcast)
             {
                 foreach (Farmer farmer in Game1.getOnlineFarmers())
-                {
-                    if (farmer != Game1.player) // don't fire to the current player as it overwrites some fields as it is not a copy of the message
-                        FireEvent(myEvent, farmer);
-                }
-
-                FireEvent(myEvent, Game1.player);
-
+                    FireEvent(myEvent, farmer);
                 return;
             }
 
             if (toWhom == null)
-            {
                 toWhom = Game1.MasterPlayer;
-            }
 
             if (Context.IsMultiplayer && toWhom != Game1.player)
             {
@@ -617,15 +642,15 @@ namespace NpcAdventure.NetCode
 
         }
 
-        public class SendChestEvent : NpcSyncEvent
+        public class SendBagEvent : NpcSyncEvent
         {
             public const string EVENTNAME = "sendChestEvent";
             public string npc;
             public string chestContents;
 
-            public SendChestEvent() { }
+            public SendBagEvent() { }
 
-            public SendChestEvent(NPC n, Chest chest) : base(EVENTNAME)
+            public SendBagEvent(NPC n, Chest chest) : base(EVENTNAME)
             {
                 MemoryStream stream = new MemoryStream();
                 BinaryWriter writer = new BinaryWriter(stream);
