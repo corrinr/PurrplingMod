@@ -26,9 +26,6 @@ namespace NpcAdventure.AI.Controller
         public const float DECELERATION = 0.025f;
 
         private Vector2 negativeOne = new Vector2(-1, -1);
-
-        public Character leader;
-        public NPC follower;
         protected PathFinder pathFinder;
         public int followingLostTime = 0;
         public Queue<Vector2> pathToFollow;
@@ -55,13 +52,15 @@ namespace NpcAdventure.AI.Controller
 
         public virtual bool IsIdle => this.idleTImer == 0;
 
+        public NPC Follower { get => this.ai.Csm.Companion; }
+        public Character Leader { get; set; }
+
         internal FollowController(AI_StateMachine ai)
         {
             this.pathToFollow = new Queue<Vector2>();
             this.ai = ai;
-            this.leader = ai.player;
-            this.follower = ai.npc;
-            this.pathFinder = new PathFinder(this.follower.currentLocation, this.follower, this.leader);
+            this.Leader = ai.player;
+            this.pathFinder = new PathFinder(this.Follower.currentLocation, this.Follower, this.Leader);
 
             this.characterMoveUp = typeof(Character).GetField("moveUp", BindingFlags.NonPublic | BindingFlags.Instance);
             this.characterMoveDown = typeof(Character).GetField("moveDown", BindingFlags.NonPublic | BindingFlags.Instance);
@@ -90,7 +89,7 @@ namespace NpcAdventure.AI.Controller
 
         public virtual void Update(UpdateTickedEventArgs e)
         {
-            if (this.follower == null || this.leader == null || (!Context.IsPlayerFree && !Context.IsMultiplayer))
+            if (this.Follower == null || this.Leader == null || (!Context.IsPlayerFree && !Context.IsMultiplayer))
                 return;
 
             this.CheckIdleState();
@@ -124,7 +123,7 @@ namespace NpcAdventure.AI.Controller
 
             if (this.facingDirection >= 0)
             {
-                this.follower.faceDirection(this.facingDirection);
+                this.Follower.faceDirection(this.facingDirection);
                 this.SetMovementDirectionAnimation(this.facingDirection);
             }
         }
@@ -143,7 +142,7 @@ namespace NpcAdventure.AI.Controller
 
         protected void SetMovementDirectionAnimation(int dir)
         {
-            string footStepSound = Utility.isOnScreen(this.follower.getTileLocationPoint(), 1, this.follower.currentLocation) ? "Cowboy_Footstep" : "";
+            string footStepSound = Utility.isOnScreen(this.Follower.getTileLocationPoint(), 1, this.Follower.currentLocation) ? "Cowboy_Footstep" : "";
             if (dir < 0 || dir > 3)
                 return;
 
@@ -152,13 +151,13 @@ namespace NpcAdventure.AI.Controller
             switch (dir)
             {
                 case 0:
-                    this.follower.Sprite.AnimateUp(Game1.currentGameTime, 0, footStepSound); break;
+                    this.Follower.Sprite.AnimateUp(Game1.currentGameTime, 0, footStepSound); break;
                 case 1:
-                    this.follower.Sprite.AnimateRight(Game1.currentGameTime, 0, footStepSound); break;
+                    this.Follower.Sprite.AnimateRight(Game1.currentGameTime, 0, footStepSound); break;
                 case 2:
-                    this.follower.Sprite.AnimateDown(Game1.currentGameTime, 0, footStepSound); break;
+                    this.Follower.Sprite.AnimateDown(Game1.currentGameTime, 0, footStepSound); break;
                 case 3:
-                    this.follower.Sprite.AnimateLeft(Game1.currentGameTime, 0, footStepSound); break;
+                    this.Follower.Sprite.AnimateLeft(Game1.currentGameTime, 0, footStepSound); break;
             }
         }
         protected void SetMovingOnlyOneDirection(int dir)
@@ -169,54 +168,54 @@ namespace NpcAdventure.AI.Controller
             switch (dir)
             {
                 case 0:
-                    this.characterMoveUp.SetValue(this.follower, true);
-                    this.characterMoveDown.SetValue(this.follower, false);
-                    this.characterMoveLeft.SetValue(this.follower, false);
-                    this.characterMoveRight.SetValue(this.follower, false);
+                    this.characterMoveUp.SetValue(this.Follower, true);
+                    this.characterMoveDown.SetValue(this.Follower, false);
+                    this.characterMoveLeft.SetValue(this.Follower, false);
+                    this.characterMoveRight.SetValue(this.Follower, false);
                     break;
                 case 1:
-                    this.characterMoveUp.SetValue(this.follower, false);
-                    this.characterMoveDown.SetValue(this.follower, false);
-                    this.characterMoveLeft.SetValue(this.follower, false);
-                    this.characterMoveRight.SetValue(this.follower, true);
+                    this.characterMoveUp.SetValue(this.Follower, false);
+                    this.characterMoveDown.SetValue(this.Follower, false);
+                    this.characterMoveLeft.SetValue(this.Follower, false);
+                    this.characterMoveRight.SetValue(this.Follower, true);
                     break;
                 case 2:
-                    this.characterMoveUp.SetValue(this.follower, false);
-                    this.characterMoveDown.SetValue(this.follower, true);
-                    this.characterMoveLeft.SetValue(this.follower, false);
-                    this.characterMoveRight.SetValue(this.follower, false);
+                    this.characterMoveUp.SetValue(this.Follower, false);
+                    this.characterMoveDown.SetValue(this.Follower, true);
+                    this.characterMoveLeft.SetValue(this.Follower, false);
+                    this.characterMoveRight.SetValue(this.Follower, false);
                     break;
                 case 3:
-                    this.characterMoveUp.SetValue(this.follower, false);
-                    this.characterMoveDown.SetValue(this.follower, false);
-                    this.characterMoveLeft.SetValue(this.follower, true);
-                    this.characterMoveRight.SetValue(this.follower, false);
+                    this.characterMoveUp.SetValue(this.Follower, false);
+                    this.characterMoveDown.SetValue(this.Follower, false);
+                    this.characterMoveLeft.SetValue(this.Follower, true);
+                    this.characterMoveRight.SetValue(this.Follower, false);
                     break;
             }
         }
 
         protected virtual void PathfindingRemakeCheck()
         {
-            if (this.leader == null || this.leader.currentLocation == null)
+            if (this.Leader == null || this.Leader.currentLocation == null)
                 return;
 
-            Vector2 leaderCurrentTile = this.leader.getTileLocation();
+            Vector2 leaderCurrentTile = this.Leader.getTileLocation();
 
-            if (this.pathFinder.GameLocation != this.leader.currentLocation) {
-                this.pathFinder.GameLocation = this.leader.currentLocation;
+            if (this.pathFinder.GameLocation != this.Leader.currentLocation) {
+                this.pathFinder.GameLocation = this.Leader.currentLocation;
             }
 
             if (this.leaderLastTileCheckPoint != leaderCurrentTile)
             {
-                this.pathToFollow = this.pathFinder.Pathfind(this.follower.getTileLocation(), leaderCurrentTile);
+                this.pathToFollow = this.pathFinder.Pathfind(this.Follower.getTileLocation(), leaderCurrentTile);
 
-                if (this.pathToFollow != null && this.pathToFollow.Count > 0 && this.follower.getTileLocation() != this.pathToFollow.Peek())
+                if (this.pathToFollow != null && this.pathToFollow.Count > 0 && this.Follower.getTileLocation() != this.pathToFollow.Peek())
                     this.currentFollowedPoint = this.pathToFollow.Dequeue();
                 else
                 {
-                    if (this.leader is Farmer && ++this.retryCount >= 3)
+                    if (this.Leader is Farmer && ++this.retryCount >= 3)
                     {
-                        this.follower.setTileLocation(this.leader.getTileLocation());
+                        this.Follower.setTileLocation(this.Leader.getTileLocation());
                         this.retryCount = 0;
                     }
                 }
@@ -229,7 +228,7 @@ namespace NpcAdventure.AI.Controller
         {
             if (this.currentFollowedPoint != this.negativeOne && this.pathToFollow != null)
             {
-                Point w = this.follower.GetBoundingBox().Center;
+                Point w = this.Follower.GetBoundingBox().Center;
                 Point n = new Point(((int)this.currentFollowedPoint.X * 64) + 32, ((int)this.currentFollowedPoint.Y * 64) + 32);
                 Vector2 nodeDiff = new Vector2(n.X, n.Y) - new Vector2(w.X, w.Y);
                 float nodeDiffLen = nodeDiff.Length();
@@ -238,7 +237,7 @@ namespace NpcAdventure.AI.Controller
                 {
                     if (this.pathToFollow.Count == 0)
                     {
-                        this.follower.Sprite.StopAnimation();
+                        this.Follower.Sprite.StopAnimation();
                         this.pathToFollow = null;
                         this.currentFollowedPoint = this.negativeOne;
                         return;
@@ -252,7 +251,7 @@ namespace NpcAdventure.AI.Controller
         {
             if (distanceFromFarmer > MOVE_THRESHOLD_DISTANCE * Game1.tileSize * 4)
             {
-                if (this.leader is Farmer farmer && farmer.getMovementSpeed() > 5.28f)
+                if (this.Leader is Farmer farmer && farmer.getMovementSpeed() > 5.28f)
                     return farmer.getMovementSpeed() + 2.65f;
 
                 return 5.28f;
@@ -260,7 +259,7 @@ namespace NpcAdventure.AI.Controller
 
             if (distanceFromFarmer > MOVE_THRESHOLD_DISTANCE * Game1.tileSize)
             {
-                if (this.leader is Farmer farmer)
+                if (this.Leader is Farmer farmer)
                     return farmer.getMovementSpeed();
                 return 4f;
             }
@@ -276,8 +275,8 @@ namespace NpcAdventure.AI.Controller
         {
             Rectangle tileBox = new Rectangle((int)endPointTile.X * 64, (int)endPointTile.Y * 64, 64, 64);
             tileBox.Inflate(-2, 0);
-            Point fp = this.follower.GetBoundingBox().Center;
-            Point lp = this.leader.GetBoundingBox().Center;
+            Point fp = this.Follower.GetBoundingBox().Center;
+            Point lp = this.Leader.GetBoundingBox().Center;
             this.lastFrameMovement = new Vector2(fp.X, fp.Y) - this.lastFramePosition;
 
             Vector2 diff = new Vector2(lp.X, lp.Y) - new Vector2(fp.X, fp.Y);
@@ -294,18 +293,18 @@ namespace NpcAdventure.AI.Controller
 
                 nodeDiff /= nodeDiffLen;
 
-                this.follower.xVelocity = nodeDiff.X * this.speed;
-                this.follower.yVelocity = -nodeDiff.Y * this.speed;
+                this.Follower.xVelocity = nodeDiff.X * this.speed;
+                this.Follower.yVelocity = -nodeDiff.Y * this.speed;
                 this.HandleWallSliding();
                 this.HandleGates();
 
-                this.lastFrameVelocity = new Vector2(this.follower.xVelocity, this.follower.yVelocity);
+                this.lastFrameVelocity = new Vector2(this.Follower.xVelocity, this.Follower.yVelocity);
                 this.lastFramePosition = new Vector2(fp.X, fp.Y);
 
-                this.animationUpdateSum += new Vector2(this.follower.xVelocity, -this.follower.yVelocity);
+                this.animationUpdateSum += new Vector2(this.Follower.xVelocity, -this.Follower.yVelocity);
                 this.AnimationSubUpdate();
 
-                this.follower.MovePosition(Game1.currentGameTime, Game1.viewport, this.follower.currentLocation); // Update follower movement
+                this.Follower.MovePosition(Game1.currentGameTime, Game1.viewport, this.Follower.currentLocation); // Update follower movement
                 this.lastMovementDirection = this.lastFrameVelocity / this.lastFrameVelocity.Length();
 
                 this.movedLastFrame = true;
@@ -313,33 +312,33 @@ namespace NpcAdventure.AI.Controller
             }
             else if (this.movedLastFrame)
             {
-                this.follower.Halt();
-                this.follower.Sprite.faceDirectionStandard(this.GetFacingDirectionFromMovement(new Vector2(this.lastMovementDirection.X, -this.lastMovementDirection.Y)));
+                this.Follower.Halt();
+                this.Follower.Sprite.faceDirectionStandard(this.GetFacingDirectionFromMovement(new Vector2(this.lastMovementDirection.X, -this.lastMovementDirection.Y)));
                 this.movedLastFrame = false;
                 this.idleTImer = Game1.random.Next(480, 840);
             }
             else
             {
-                this.follower.xVelocity = 0;
-                this.follower.yVelocity = 0;
+                this.Follower.xVelocity = 0;
+                this.Follower.yVelocity = 0;
             }
         }
 
         protected void HandleWallSliding()
         {
             if (this.lastFrameVelocity != Vector2.Zero && this.lastFrameMovement == Vector2.Zero &&
-                (this.follower.xVelocity != 0 || this.follower.yVelocity != 0))
+                (this.Follower.xVelocity != 0 || this.Follower.yVelocity != 0))
             {
-                Rectangle wbBB = this.follower.GetBoundingBox();
-                GameLocation location = this.follower.currentLocation;
+                Rectangle wbBB = this.Follower.GetBoundingBox();
+                GameLocation location = this.Follower.currentLocation;
                 int ts = Game1.tileSize;
                 bool xBlocked, yBlocked;
                 xBlocked = yBlocked = false;
 
-                if (this.follower.xVelocity != 0)
+                if (this.Follower.xVelocity != 0)
                 {
-                    int velocitySign = Math.Sign(this.follower.xVelocity) * 15;
-                    int leftOrRight = ((this.follower.xVelocity > 0 ? wbBB.Right : wbBB.Left) + velocitySign) / ts;
+                    int velocitySign = Math.Sign(this.Follower.xVelocity) * 15;
+                    int leftOrRight = ((this.Follower.xVelocity > 0 ? wbBB.Right : wbBB.Left) + velocitySign) / ts;
                     bool[] xTiles = new bool[3];
                     xTiles[0] = this.pathFinder.IsWalkableTile(new Vector2(leftOrRight, wbBB.Top / ts));
                     xTiles[1] = this.pathFinder.IsWalkableTile(new Vector2(leftOrRight, wbBB.Center.Y / ts));
@@ -348,17 +347,17 @@ namespace NpcAdventure.AI.Controller
                     {
                         if (!b)
                         {
-                            this.follower.xVelocity *= -0.25f;
+                            this.Follower.xVelocity *= -0.25f;
                             xBlocked = true;
                             break;
                         }
                     }
                 }
 
-                if (this.follower.yVelocity != 0)
+                if (this.Follower.yVelocity != 0)
                 {
-                    int velocitySign = Math.Sign(this.follower.yVelocity) * 15;
-                    int topOrBottom = ((this.follower.yVelocity < 0 ? wbBB.Bottom : wbBB.Top) - velocitySign) / ts;
+                    int velocitySign = Math.Sign(this.Follower.yVelocity) * 15;
+                    int topOrBottom = ((this.Follower.yVelocity < 0 ? wbBB.Bottom : wbBB.Top) - velocitySign) / ts;
                     bool[] yTiles = new bool[3];
                     yTiles[0] = this.pathFinder.IsWalkableTile(new Vector2(wbBB.Left / ts, topOrBottom));
                     yTiles[1] = this.pathFinder.IsWalkableTile(new Vector2(wbBB.Center.X / ts, topOrBottom));
@@ -367,7 +366,7 @@ namespace NpcAdventure.AI.Controller
                     {
                         if (!b)
                         {
-                            this.follower.yVelocity *= -0.25f;
+                            this.Follower.yVelocity *= -0.25f;
                             yBlocked = true;
                             break;
                         }
@@ -375,22 +374,22 @@ namespace NpcAdventure.AI.Controller
                 }
 
                 if (xBlocked)
-                    this.follower.yVelocity *= 2.5f;
+                    this.Follower.yVelocity *= 2.5f;
                 else if (yBlocked)
-                    this.follower.xVelocity *= 2.5f;
+                    this.Follower.xVelocity *= 2.5f;
             }
         }
 
         protected void HandleGates()
         {
-            if (this.gatesInThisLocation && (this.follower.xVelocity != 0 || this.follower.yVelocity != 0))
+            if (this.gatesInThisLocation && (this.Follower.xVelocity != 0 || this.Follower.yVelocity != 0))
             {
-                GameLocation l = this.follower.currentLocation;
-                Vector2 velocity = new Vector2(this.follower.xVelocity, -this.follower.yVelocity);
+                GameLocation l = this.Follower.currentLocation;
+                Vector2 velocity = new Vector2(this.Follower.xVelocity, -this.Follower.yVelocity);
                 velocity.Normalize();
                 velocity = velocity * 64 * 1.3f;
-                Vector2 bbVector = new Vector2(this.follower.GetBoundingBox().Center.X, this.follower.GetBoundingBox().Center.Y);
-                Vector2 tile = this.follower.getTileLocation();
+                Vector2 bbVector = new Vector2(this.Follower.GetBoundingBox().Center.X, this.Follower.GetBoundingBox().Center.Y);
+                Vector2 tile = this.Follower.getTileLocation();
                 Vector2 tileAhead = (bbVector + velocity) / 64;
                 Vector2 tileBehind = (bbVector - velocity) / 64;
                 Vector2 tileBehindNeighbor1, tileBehindNeighbor2;
@@ -442,8 +441,8 @@ namespace NpcAdventure.AI.Controller
 
         private bool CheckForGatesInThisLocation()
         {
-            foreach (Vector2 o in this.follower.currentLocation.Objects.Keys)
-                if (this.follower.currentLocation.Objects[o] is Fence f && f.isGate.Value)
+            foreach (Vector2 o in this.Follower.currentLocation.Objects.Keys)
+                if (this.Follower.currentLocation.Objects[o] is Fence f && f.isGate.Value)
                     return true;
 
             return false;
@@ -451,7 +450,7 @@ namespace NpcAdventure.AI.Controller
 
         public virtual void Activate()
         {
-            if (this.leader != null && Context.IsMainPlayer)
+            if (this.Leader != null && Context.IsMainPlayer)
             {
                 this.PathfindingRemakeCheck();
             }

@@ -10,6 +10,7 @@ using NpcAdventure.HUD;
 using NpcAdventure.Compatibility;
 using NpcAdventure.Story;
 using NpcAdventure.Story.Scenario;
+using System;
 
 namespace NpcAdventure
 {
@@ -51,10 +52,17 @@ namespace NpcAdventure
             events.GameLoop.DayEnding += this.GameLoop_DayEnding;
             events.GameLoop.DayStarted += this.GameLoop_DayStarted;
             events.GameLoop.GameLaunched += this.GameLoop_GameLaunched;
+            events.World.NpcListChanged += this.World_NpcListChanged;
 
             this.netEvents.Register(events);
             events.GameLoop.UpdateTicked += this.GameLoop_UpdateTicked;
             events.Display.RenderingHud += this.Display_RenderingHud;
+        }
+
+        private void World_NpcListChanged(object sender, NpcListChangedEventArgs e)
+        {
+            if (!Context.IsMainPlayer)
+                this.CompanionManager.UpdateNPC(e);
         }
 
         private void GameLoop_Saving(object sender, SavingEventArgs e)

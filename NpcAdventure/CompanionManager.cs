@@ -78,6 +78,18 @@ namespace NpcAdventure
             }
         }
 
+        internal void UpdateNPC(NpcListChangedEventArgs e)
+        {
+            foreach(NPC n in e.Added)
+            {
+                CompanionStateMachine csm = this.PossibleCompanions[n.Name];
+                if (csm != null)
+                {
+                    csm.ReseatCompanion(n);
+                }
+            }
+        }
+
         /// <summary>
         /// Handle check hint event from event driver
         /// </summary>
@@ -222,15 +234,6 @@ namespace NpcAdventure
 
             this.monitor.Log($"Initalized {this.PossibleCompanions.Count} companions.", LogLevel.Info);
             this.loader = loader;
-        }
-
-        public void ReinitializeNPCs()
-        {
-            Dictionary<string, string> dispositions = this.loader.Load<Dictionary<string, string>>("Data/CompanionDispositions");
-            foreach (string npcName in dispositions.Keys) {
-                CompanionStateMachine xcsm = this.PossibleCompanions[npcName];
-                xcsm.Companion = Game1.getCharacterFromName(npcName, true);
-            }
         }
 
         /// <summary>

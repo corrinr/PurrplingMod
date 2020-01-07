@@ -31,12 +31,12 @@ namespace NpcAdventure.StateMachine
             UNAVAILABLE,
         }
         public CompanionManager CompanionManager { get; private set; }
-        public NPC Companion { get; set; }
+        public NPC Companion { get; private set; }
         public CompanionMetaData Metadata { get; }
         public IContentLoader ContentLoader { get; private set; }
         private IMonitor Monitor { get; }
 
-        public  Chest Bag { get; set; }
+        public Chest Bag { get; set; }
         public IReflectionHelper Reflection { get; }
         public Dictionary<StateFlag, ICompanionState> States { get; private set; }
         public ICompanionState currentState { get; private set; }
@@ -98,6 +98,12 @@ namespace NpcAdventure.StateMachine
             this.currentState = newState;
             this.Monitor.Log($"{this.Name} changed state: {this.CurrentStateFlag.ToString()} -> {stateFlag.ToString()}");
             this.CurrentStateFlag = stateFlag;
+        }
+
+        internal void ReseatCompanion(NPC n)
+        {
+            if (n.Name == this.Companion.Name)
+                this.Companion = n;
         }
 
         /// <summary>

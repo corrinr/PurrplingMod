@@ -1,4 +1,5 @@
-﻿using NpcAdventure.AI.Controller;
+﻿using Microsoft.Xna.Framework;
+using NpcAdventure.AI.Controller;
 using NpcAdventure.Loader;
 using NpcAdventure.StateMachine;
 using NpcAdventure.StateMachine.State;
@@ -360,11 +361,7 @@ namespace NpcAdventure.NetCode
                     FightController fc = rs.ai.CurrentController as FightController;
                     if (fc != null)
                     {
-                        //fc.AnimateMeLocal(caa.x, caa.y, caa.direction);
-                        Character character = Game1.getCharacterFromName(caa.npc, true);
-                        string posIsNull = (character == null ? "yes" : "no");
-                        NpcAdventureMod.GameMonitor.Log("character " + caa.npc + " is null ? " + posIsNull + " am I a master?" + (Context.IsMainPlayer ? "yes" : "no"));
-                        fc.AnimateMeLocal(character.Position.X, character.Position.Y, caa.direction);
+                        fc.AnimateMeLocal();
                     }
                 }
             }
@@ -406,10 +403,6 @@ namespace NpcAdventure.NetCode
 
                         break;
                 }
-
-                if (!Context.IsMainPlayer)
-                    this.manager.ReinitializeNPCs();
-
             }
         }
 
@@ -704,18 +697,12 @@ namespace NpcAdventure.NetCode
             public const string EVENTNAME = "companionAttackAnimation";
 
             public string npc;
-            public float x;
-            public float y;
-            public int direction;
 
             public CompanionAttackAnimation() { }
 
-            public CompanionAttackAnimation(NPC n, float x, float y, int direction) : base(EVENTNAME)
+            public CompanionAttackAnimation(NPC n) : base(EVENTNAME)
             {
                 this.npc = n.Name;
-                this.x = x;
-                this.y = y;
-                this.direction = direction;
             }
         }
     }
